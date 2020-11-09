@@ -1,0 +1,50 @@
+{
+    "gamma": 0.99,
+    "n_steps": 5,
+    "vf_coef": 0.25,
+    "ent_coef": 0.01,
+    "max_grad_norm": 0.5,
+    "learning_rate": 0.0001,
+    "alpha": 0.99,
+    "epsilon": 1e-05,
+    "lr_schedule": "constant",
+    "verbose": 0,
+    "policy": {
+        ":type:": "<class 'abc.ABCMeta'>",
+        ":serialized:": "gASVMgAAAAAAAACMIHN0YWJsZV9iYXNlbGluZXMuY29tbW9uLnBvbGljaWVzlIwJTWxwUG9saWN5lJOULg==",
+        "__module__": "stable_baselines.common.policies",
+        "__doc__": "\n    Policy object that implements actor critic, using a MLP (2 layers of 64)\n\n    :param sess: (TensorFlow session) The current TensorFlow session\n    :param ob_space: (Gym Space) The observation space of the environment\n    :param ac_space: (Gym Space) The action space of the environment\n    :param n_env: (int) The number of environments to run\n    :param n_steps: (int) The number of steps to run for each environment\n    :param n_batch: (int) The number of batch to run (n_envs * n_steps)\n    :param reuse: (bool) If the policy is reusable or not\n    :param _kwargs: (dict) Extra keyword arguments for the nature CNN feature extraction\n    ",
+        "__init__": "<function MlpPolicy.__init__ at 0x00000234E23BF510>",
+        "__abstractmethods__": "frozenset()",
+        "_abc_registry": "<_weakrefset.WeakSet object at 0x00000234E23C1048>",
+        "_abc_cache": "<_weakrefset.WeakSet object at 0x00000234E23C1080>",
+        "_abc_negative_cache": "<_weakrefset.WeakSet object at 0x00000234E23C10F0>",
+        "_abc_negative_cache_version": 52
+    },
+    "observation_space": {
+        ":type:": "<class 'gym.spaces.box.Box'>",
+        ":serialized:": "gASV3AEAAAAAAACMDmd5bS5zcGFjZXMuYm94lIwDQm94lJOUKYGUfZQojAVkdHlwZZSMBW51bXB5lIwFZHR5cGWUk5SMAmY0lImIh5RSlChLA4wBPJROTk5K/////0r/////SwB0lGKMBXNoYXBllEsKhZSMA2xvd5SMFW51bXB5LmNvcmUubXVsdGlhcnJheZSMDF9yZWNvbnN0cnVjdJSTlGgGjAduZGFycmF5lJOUSwCFlEMBYpSHlFKUKEsBSwqFlGgLiUMoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJR0lGKMBGhpZ2iUaBNoFUsAhZRoF4eUUpQoSwFLCoWUaAuJQygAAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/lHSUYowNYm91bmRlZF9iZWxvd5RoE2gVSwCFlGgXh5RSlChLAUsKhZRoCIwCYjGUiYiHlFKUKEsDjAF8lE5OTkr/////Sv////9LAHSUYolDCgEBAQEBAQEBAQGUdJRijA1ib3VuZGVkX2Fib3ZllGgTaBVLAIWUaBeHlFKUKEsBSwqFlGgriUMKAQEBAQEBAQEBAZR0lGKMCl9ucF9yYW5kb22UTnViLg==",
+        "dtype": "float32",
+        "shape": [
+            10
+        ],
+        "low": "[0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]",
+        "high": "[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]",
+        "bounded_below": "[ True  True  True  True  True  True  True  True  True  True]",
+        "bounded_above": "[ True  True  True  True  True  True  True  True  True  True]",
+        "_np_random": null
+    },
+    "action_space": {
+        ":type:": "<class 'gym.spaces.discrete.Discrete'>",
+        ":serialized:": "gASVhwAAAAAAAACME2d5bS5zcGFjZXMuZGlzY3JldGWUjAhEaXNjcmV0ZZSTlCmBlH2UKIwBbpRLCowFc2hhcGWUKYwFZHR5cGWUjAVudW1weZSMBWR0eXBllJOUjAJpOJSJiIeUUpQoSwOMATyUTk5OSv////9K/////0sAdJRijApfbnBfcmFuZG9tlE51Yi4=",
+        "n": 10,
+        "shape": [],
+        "dtype": "int64",
+        "_np_random": null
+    },
+    "n_envs": 1,
+    "n_cpu_tf_sess": null,
+    "seed": null,
+    "_vectorize_action": false,
+    "policy_kwargs": {}
+}
