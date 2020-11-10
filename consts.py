@@ -8,3 +8,7 @@ K = 10
 F = [1]
 
 BLOCKS_EP = 100
+
+GAMMA = 0.99
+LR = 1e-03
+EPSILON = 1e-05

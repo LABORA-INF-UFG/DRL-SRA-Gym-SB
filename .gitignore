@@ -1,2 +1,11 @@
 *.zip
 venv/
+lib64
+pyvenv.cfg
+share/
+sra_env/__pycache__/
+include/
+bin/
+lib/
+exp1/
+akpy/MassiveMIMOSystem5.py

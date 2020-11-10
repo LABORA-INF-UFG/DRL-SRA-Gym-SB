@@ -102,7 +102,7 @@ class SRAEnv(gym.Env):
             pass
         # Optionally we can pass additional info, we are not using that for now
         info = {}
-        print("Episode " + str(self.ep_count) + " - Block " + str(self.curr_block))
+        #print("Episode " + str(self.ep_count) + " - Block " + str(self.curr_block))
         return self.observation_space, reward, self.end_ep, info
 
     def step_(self,action):
@@ -239,7 +239,8 @@ class SRAEnv(gym.Env):
         max_rate = np.max(thr)
         p_rates = thr / self.buffer_size
         #return np.hstack((buffer_occupancies, spectral_eff.flatten(), p_rates.flatten(), oldest_packet_per_buffer))
-        return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
+        #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
+        return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
 
     # calculation of packets transmission and reception (from transmit_and_receive_new_packets function)
     def pktFlow(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
