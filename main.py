@@ -11,8 +11,7 @@ env = SRAEnv()
 
 model1 = A2C(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR, epsilon=consts.EPSILON)
 model2 = ACKTR(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
-
-tqdm_e = tqdm(range(3), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_e = tqdm(range(90,5000,5), desc='Time Steps', leave=True, unit=" time steps")
 for i in tqdm_e:
 
     ts = consts.BLOCKS_EP * (i + 1)

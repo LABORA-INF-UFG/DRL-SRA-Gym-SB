@@ -3,6 +3,7 @@ from typing import Tuple
 import gym
 from gym import spaces
 import numpy as np
+import copy
 
 import consts
 from akpy.MassiveMIMOSystem5 import MassiveMIMOSystem
@@ -12,6 +13,8 @@ class SRAEnv(gym.Env):
 
     def __init__(self):
         self.__version__ = "0.1.0"
+        self.type = None
+        self.par_envs = {'Master': [], 'Slave': []}
         self.ep_count = 1
         self.end_ep = False  # Indicate the end of an episode
         self.K = consts.K
@@ -62,6 +65,9 @@ class SRAEnv(gym.Env):
         self.schedulers = []
         obs = self.reset()
         self.observation_space = spaces.Box(low=0,high=1,shape=obs.shape,dtype=np.float32)
+        #self.observation_space = spaces.Box(low=0, high=1, shape=(30,), dtype=np.float32)
+
+
 
     def step(self,action):
 
@@ -108,7 +114,8 @@ class SRAEnv(gym.Env):
     def step_(self,action):
 
         reward_schedulers = []
-        pkt_loss = [[] for i in range(len(self.schedulers) + 1)]
+        #pkt_loss = [[] for i in range(len(self.schedulers) + 1)]
+        pkt_loss = []
         # dealing with the schedulers
         for id, sc in enumerate(self.schedulers):
             if sc.name == 'Round Robin':
@@ -121,7 +128,7 @@ class SRAEnv(gym.Env):
             # computing the rewards for each scheduler
             rws, dpkts = self.rewardCalcSchedulers(self.mimo_systems, rates_pkt_per_s_schedulers, sc.buffers)
             reward_schedulers.append(rws)
-            pkt_loss[id + 1].append(dpkts)
+            pkt_loss.append(dpkts)
             # clearing alloc users
             sc.clear()
 
@@ -145,7 +152,7 @@ class SRAEnv(gym.Env):
         self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
                                                       self.recent_spectral_eff, self.curr_slot)
         reward, drop = self.rewardCalc(self.alloc_users)
-        pkt_loss[0].append(drop)
+        pkt_loss.append(drop)
         # resetting the allocated users
         self.alloc_users = [[] for i in range(len(self.F))]
 
@@ -240,7 +247,10 @@ class SRAEnv(gym.Env):
         p_rates = thr / self.buffer_size
         #return np.hstack((buffer_occupancies, spectral_eff.flatten(), p_rates.flatten(), oldest_packet_per_buffer))
         #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
-        return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
+        # using matrix state - models - run_simulation2.py
+        #return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
+        #using vector state - models2 - run_simulation3.py
+        return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
 
     # calculation of packets transmission and reception (from transmit_and_receive_new_packets function)
     def pktFlow(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
@@ -287,6 +297,11 @@ class SRAEnv(gym.Env):
         self.end_ep = True
         self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
                                                      self.max_spectral_eff, self.max_packet_age)
+
+        if self.type == "Slave":
+            master_env = self.par_envs['Master'][0]
+            self.mimo_systems = master_env.mimo_systems
+            self.buffers = copy.deepcopy(master_env.buffers)
 
         self.ep_count += 1
 
