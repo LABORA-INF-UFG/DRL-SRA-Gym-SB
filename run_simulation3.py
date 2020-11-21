@@ -20,7 +20,7 @@ env1.type = "Master"
 
 
 
-tqdm_e = tqdm(range(0,10,5), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
 obs, rw, endep, info = env1.step_(0)
 obs2 = copy.deepcopy(obs)
 env2 = copy.deepcopy(env1)
@@ -51,7 +51,7 @@ for i in tqdm_e:
     p_reward_schedulers_2 = copy.deepcopy(p_reward_schedulers_1)
     p_pkt_loss_1, p_pkt_loss_2 = [], []
 
-    for i in range(2):
+    for i in range(10):
         rw_drl_a_1 = []
         rw_drl_a_2 = []
         rw_sh_1 = []

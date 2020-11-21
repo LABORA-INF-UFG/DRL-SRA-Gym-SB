@@ -248,9 +248,9 @@ class SRAEnv(gym.Env):
         #return np.hstack((buffer_occupancies, spectral_eff.flatten(), p_rates.flatten(), oldest_packet_per_buffer))
         #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
         # using matrix state - models - run_simulation2.py
-        #return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
+        return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
         #using vector state - models2 - run_simulation3.py
-        return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
+        #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
 
     # calculation of packets transmission and reception (from transmit_and_receive_new_packets function)
     def pktFlow(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
@@ -283,26 +283,27 @@ class SRAEnv(gym.Env):
 
         self.rws = []
         self.curr_block = 0
-        # Buffer
-        self.buffers.reset_buffers()  # Reseting buffers
-        # get some traffic to avoid starting from empty buffers
-        self.buffers.packets_arrival(self.mimo_systems[0].get_current_income_packets())
-
-        # MIMO Interference
-        self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F)
-
+        self.end_ep = True
         # Cleaning count of users
         self.c_users = np.zeros(self.K)
 
-        self.end_ep = True
-        self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
-                                                     self.max_spectral_eff, self.max_packet_age)
+        if self.type != "Slave":
+            # Buffer
+            self.buffers.reset_buffers()  # Reseting buffers
+            # get some traffic to avoid starting from empty buffers
+            self.buffers.packets_arrival(self.mimo_systems[0].get_current_income_packets())
 
-        if self.type == "Slave":
+            # MIMO Interference
+            self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F)
+
+
+        else:
             master_env = self.par_envs['Master'][0]
-            self.mimo_systems = master_env.mimo_systems
+            self.mimo_systems = copy.deepcopy(master_env.mimo_systems)
             self.buffers = copy.deepcopy(master_env.buffers)
 
+        self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
+                                                     self.max_spectral_eff, self.max_packet_age)
         self.ep_count += 1
 
         return self.observation_space
