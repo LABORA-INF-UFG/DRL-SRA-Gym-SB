@@ -8,6 +8,10 @@ import copy
 import consts
 from akpy.MassiveMIMOSystem5 import MassiveMIMOSystem
 from akpy.buffers_at_BS import Buffers
+from schedulers.max_th import MaxTh
+from schedulers.proportional_fair import ProportionalFair
+from schedulers.round_robin import RoundRobin
+
 
 class SRAEnv(gym.Env):
 
@@ -63,6 +67,12 @@ class SRAEnv(gym.Env):
         self.rates = [1.] * self.K
 
         self.schedulers = []
+        # creating the Round Robin scheduler instance with independent buffers
+        self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        # another scheduler instance, for testing with multiple schedulers
+        self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+
         obs = self.reset()
         self.observation_space = spaces.Box(low=0,high=1,shape=obs.shape,dtype=np.float32)
         #self.observation_space = spaces.Box(low=0, high=1, shape=(30,), dtype=np.float32)
@@ -70,13 +80,6 @@ class SRAEnv(gym.Env):
 
 
     def step(self,action):
-
-        # incrementing slot counter
-        self.curr_block += 1
-        self.alloc_users = [[] for i in range(len(self.F))]
-        self.alloc_users[self.curr_freq].append(action)
-        self.rates_pkt_per_s = self.rateEstimationUsers(self.F, self.alloc_users, self.mimo_systems, self.K,
-                                                        self.curr_slot, self.packet_size_bits)
 
         # rate estimation for all users
         rates = []
@@ -86,10 +89,19 @@ class SRAEnv(gym.Env):
             rates.append(r[i])
         self.rates = rates
 
+        # incrementing slot counter
+        self.curr_block += 1
+        self.alloc_users = [[] for i in range(len(self.F))]
+        self.alloc_users[self.curr_freq].append(action)
+        self.rates_pkt_per_s = self.rateEstimationUsers(self.F, self.alloc_users, self.mimo_systems, self.K,
+                                                        self.curr_slot, self.packet_size_bits)
+
+
         # Updating SE per user selected
         self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
                                                       self.recent_spectral_eff, self.curr_slot)
-        reward, _ = self.rewardCalc(self.alloc_users)
+        #reward, _ = self.rewardCalc(self.alloc_users)
+        reward, _ = self.rewardCalc(self.mimo_systems, self.rates_pkt_per_s, self.buffers)
 
         # resetting the allocated users
         self.alloc_users = [[] for i in range(len(self.F))]
@@ -105,7 +117,7 @@ class SRAEnv(gym.Env):
             self.end_ep = True
         else:
             self.end_ep = False
-            pass
+
         # Optionally we can pass additional info, we are not using that for now
         info = {}
         #print("Episode " + str(self.ep_count) + " - Block " + str(self.curr_block))
@@ -114,31 +126,7 @@ class SRAEnv(gym.Env):
     def step_(self,action):
 
         reward_schedulers = []
-        #pkt_loss = [[] for i in range(len(self.schedulers) + 1)]
-        pkt_loss = []
-        # dealing with the schedulers
-        for id, sc in enumerate(self.schedulers):
-            if sc.name == 'Round Robin':
-                sc.alloc_users[self.curr_freq].append(sc.policy_action())
-
-            rates_pkt_per_s_schedulers = self.rateEstimationUsers(self.F, sc.alloc_users,
-                                                                  self.mimo_systems, self.K,
-                                                                  self.curr_slot, self.packet_size_bits)
-
-            # computing the rewards for each scheduler
-            rws, dpkts = self.rewardCalcSchedulers(self.mimo_systems, rates_pkt_per_s_schedulers, sc.buffers)
-            reward_schedulers.append(rws)
-            pkt_loss.append(dpkts)
-            # clearing alloc users
-            sc.clear()
-
-
-        # incrementing slot counter
-        self.curr_block += 1
-        self.alloc_users = [[] for i in range(len(self.F))]
-        self.alloc_users[self.curr_freq].append(action)
-        self.rates_pkt_per_s = self.rateEstimationUsers(self.F, self.alloc_users, self.mimo_systems, self.K,
-                                                        self.curr_slot, self.packet_size_bits)
+        pkt_loss = [[] for i in range(len(self.schedulers) + 1)]
 
         # rate estimation for all users
         rates = []
@@ -148,11 +136,53 @@ class SRAEnv(gym.Env):
             rates.append(r[i])
         self.rates = rates
 
+        # dealing with schedulers
+        if self.type == "Master":
+            # TODO review in case of new schedulers included
+            for sc in self.schedulers:
+                # gambiarra para não quebrar a atual forma de automação da inclusão de agentes comparadores
+                # assim, para o PF, o policy action já retorna os 3 UEs a serem alocados
+                if sc.name == 'Round Robin':
+                    sc.alloc_users[self.curr_freq].append(sc.policy_action())
+            # lidando somente com o policy action para o PF/MT
+            for sc in self.schedulers:
+                if sc.name == 'Proportional Fair' or sc.name == 'Max th':
+                    sc.exp_thr = rates
+                    ues = sc.policy_action()
+                    for u in ues:
+                        sc.alloc_users[self.curr_freq].append(u)
+
+            ## schedulers
+            for id, sc in enumerate(self.schedulers):
+                rates_pkt_per_s_schedulers = self.rateEstimationUsers(self.F, sc.alloc_users,
+                                                                      self.mimo_systems, self.K,
+                                                                      self.curr_slot, self.packet_size_bits)
+                if sc.name == 'Proportional Fair':
+                    for i, v in enumerate(rates_pkt_per_s_schedulers):
+                        sc.thr_count[i].append(v)
+                # computing the rewards for each scheduler
+                rws, dpkts = self.rewardCalcSchedulers(self.mimo_systems, rates_pkt_per_s_schedulers, sc.buffers)
+                reward_schedulers.append(rws)
+                pkt_loss[id + 1].append(dpkts)
+                # clearing alloc users
+                sc.clear()
+            ####################################################
+
+        # incrementing slot counter
+        self.curr_block += 1
+        self.alloc_users = [[] for i in range(len(self.F))]
+        self.alloc_users[self.curr_freq].append(action)
+        self.rates_pkt_per_s = self.rateEstimationUsers(self.F, self.alloc_users, self.mimo_systems, self.K,
+                                                        self.curr_slot, self.packet_size_bits)
+
+
+
         # Updating SE per user selected
         self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
                                                       self.recent_spectral_eff, self.curr_slot)
-        reward, drop = self.rewardCalc(self.alloc_users)
-        pkt_loss.append(drop)
+        #reward, drop = self.rewardCalc(self.alloc_users)
+        reward, drop = self.rewardCalc(self.mimo_systems, self.rates_pkt_per_s, self.buffers)
+        pkt_loss[0].append(drop)
         # resetting the allocated users
         self.alloc_users = [[] for i in range(len(self.F))]
 
@@ -173,11 +203,11 @@ class SRAEnv(gym.Env):
 
         return self.observation_space, [reward, reward_schedulers, pkt_loss], self.end_ep, info
 
-    def rewardCalc(self, alloc_users: list) -> Tuple:  # Calculating reward value
-        pkt_rate  = self.rates_pkt_per_s
+    def rewardCalc(self, mimo_systems: list, pkt_rate, buffers: Buffers) -> Tuple:  # Calculating reward value
+        #pkt_rate  = self.rates_pkt_per_s
         (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlow(pkt_rate,
-                                                                                                self.buffers,
-                                                                                                self.mimo_systems)
+                                                                                                 buffers,
+                                                                                                 mimo_systems)
 
         reward = 10 * (tx_pkts / 50000)
 
@@ -248,9 +278,9 @@ class SRAEnv(gym.Env):
         #return np.hstack((buffer_occupancies, spectral_eff.flatten(), p_rates.flatten(), oldest_packet_per_buffer))
         #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
         # using matrix state - models - run_simulation2.py
-        return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
+        #return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
         #using vector state - models2 - run_simulation3.py
-        #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
+        return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
 
     # calculation of packets transmission and reception (from transmit_and_receive_new_packets function)
     def pktFlow(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
@@ -296,11 +326,17 @@ class SRAEnv(gym.Env):
             # MIMO Interference
             self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F)
 
+            # reseting the schedulers
+            for sc in self.schedulers:
+                sc.reset()
+                sc.buffers = copy.deepcopy(self.buffers)
 
         else:
             master_env = self.par_envs['Master'][0]
             self.mimo_systems = copy.deepcopy(master_env.mimo_systems)
             self.buffers = copy.deepcopy(master_env.buffers)
+
+
 
         self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
                                                      self.max_spectral_eff, self.max_packet_age)

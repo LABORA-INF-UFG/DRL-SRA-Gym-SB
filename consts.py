@@ -9,6 +9,14 @@ F = [1]
 
 BLOCKS_EP = 100
 
-GAMMA = 0.99
-LR = 1e-03
+GAMMA = 0.7
+GAMMA_D = '07'
+#LR = 1e-03
+LR = 0.00007
+LR_D = '00007'
 EPSILON = 1e-05
+EPSILON_D = '1e-05'
+
+
+###
+MODELS_FOLDER = 'models/'
