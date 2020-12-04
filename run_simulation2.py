@@ -1,7 +1,4 @@
 import os
-
-
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,9 +12,7 @@ from json import JSONEncoder
 import consts
 import copy
 
-from schedulers.max_th import MaxTh
-from schedulers.proportional_fair import ProportionalFair
-from schedulers.round_robin import RoundRobin
+
 from sra_env.sra_env import SRAEnv
 
 
@@ -30,9 +25,14 @@ class NumpyArrayEncoder(JSONEncoder):
 env1 = SRAEnv()
 env1.type = "Master"
 
+simulation_type = "stationary"
+#sumulation_type = "n-stationary"
+
+# number of executions per trained models
+t = 100
 
 tqdm_ = "0-200"
-tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_e = tqdm(range(0,20,5), desc='Time Steps', leave=True, unit=" time steps")
 obs, rw, endep, info = env1.step_(0)
 obs2 = copy.deepcopy(obs)
 env2 = copy.deepcopy(env1)
@@ -79,6 +79,7 @@ actions_5, actions_6, actions_7 = [], [], []
 c_act_1, c_act_2, c_act_3 = [0] * len(env1.schedulers), [0] * len(env1.schedulers), [0] * len(env1.schedulers)
 c_act_5, c_act_6, c_act_7 = [0] * len(env1.schedulers), [0] * len(env1.schedulers), [0] * len(env1.schedulers)
 tss = []
+folder = consts.MODELS_FOLDER_STATIONARY
 
 for i in tqdm_e:
     #i = 1 if i == 0 else i
@@ -87,18 +88,18 @@ for i in tqdm_e:
     tss.append(ts)
     base_file = "_gamma_" + consts.GAMMA_D + "_lr_" + consts.LR_D + '_epsilon_' + consts.EPSILON_D
     ## Loading the trained model for A2C
-    model1 = A2C.load(consts.MODELS_FOLDER+"a2c_drl_"+str(ts)+base_file)
+    model1 = A2C.load(folder+"a2c_drl_"+str(ts)+base_file)
     ## Loading the trained model for A2C
-    model2 = ACKTR.load(consts.MODELS_FOLDER+"acktr_"+str(ts)+base_file)
+    model2 = ACKTR.load(folder+"acktr_"+str(ts)+base_file)
     ## Loading the trained model for TRPO
-    model3 = TRPO.load(consts.MODELS_FOLDER+"trpo_" + str(ts)+base_file)
-    model4 = ACER.load(consts.MODELS_FOLDER+"acer_"+str(ts)+base_file)
+    model3 = TRPO.load(folder+"trpo_" + str(ts)+base_file)
+    model4 = ACER.load(folder+"acer_"+str(ts)+base_file)
     ## Loading the trained model for TRPO
-    model5 = DQN.load(consts.MODELS_FOLDER+"dqn_" + str(ts)+base_file)
+    model5 = DQN.load(folder+"dqn_" + str(ts)+base_file)
     ## Loading the trained model for TRPO
-    model6 = PPO1.load(consts.MODELS_FOLDER+"ppo1_" + str(ts)+base_file)
+    model6 = PPO1.load(folder+"ppo1_" + str(ts)+base_file)
     ## Loading the trained model for TRPO
-    model7 = PPO2.load(consts.MODELS_FOLDER+"ppo2_" + str(ts)+base_file)
+    model7 = PPO2.load(folder+"ppo2_" + str(ts)+base_file)
 
     p_rewards_drl_agent_1, p_rewards_drl_agent_2, p_rewards_drl_agent_3= [], [], []
     p_rewards_drl_agent_4 = []
@@ -111,7 +112,6 @@ for i in tqdm_e:
     #p_pkt_schedulers = [[0.] for i in range(len(env1.schedulers))]
     p_pkt_schedulers = [[] for i in range(len(env1.schedulers))]
 
-    t = 10
     for i in range(t):
         rw_drl_a_1, rw_drl_a_2, rw_drl_a_3, rw_drl_a_4, rw_drl_a_5, rw_drl_a_6, rw_drl_a_7 = [], [], [], [], [], [], []
         # rewards for schedulers
@@ -241,16 +241,6 @@ for i in tqdm_e:
     pkt_loss_6.append(np.mean(p_pkt_loss_6))
     pkt_loss_7.append(np.mean(p_pkt_loss_7))
 
-figure, axis = plt.subplots(2)
-axis[0].plot(tss, rewards_drl_agent_1, label=r'DRL-SRA$_{A2C}$')
-axis[0].plot(tss, rewards_drl_agent_2, label=r'DRL-SRA$_{ACKTR}$')
-axis[0].plot(tss, rewards_drl_agent_3, label=r'DRL-SRA$_{TRPO}$')
-axis[0].plot(tss, rewards_drl_agent_4, label=r'DRL-SRA$_{ACER}$')
-axis[0].plot(tss, rewards_drl_agent_5, label=r'DRL-SRA$_{DQN}$')
-axis[0].plot(tss, rewards_drl_agent_6, label=r'DRL-SRA$_{PPO1}$')
-axis[0].plot(tss, rewards_drl_agent_7, label=r'DRL-SRA$_{PPO2}$')
-
-
 ## savind results
 history={
     "rewards_drl_agents":{
@@ -272,12 +262,22 @@ history={
         "PPO1": pkt_loss_6,
         "PPO2": pkt_loss_7,
     },
-    "pkt_loss_schedulers": pkt_loss_sch
+    "pkt_loss_schedulers": pkt_loss_sch,
+    "tss": tss
 }
 
-with open('history/history_'+str(tqdm_)+'_'+str(t)+'_rounds_'+str(env1.blocks_ep)+'_bloks_eps.json', 'w') as outfile:
+with open('history/'+simulation_type+'_history_'+str(tqdm_)+'_'+str(t)+'_rounds_'+str(env1.blocks_ep)+'_bloks_eps.json', 'w') as outfile:
     json.dump(history, outfile, cls=NumpyArrayEncoder)
 #############################
+
+figure, axis = plt.subplots(2)
+axis[0].plot(tss, rewards_drl_agent_1, label=r'DRL-SRA$_{A2C}$')
+axis[0].plot(tss, rewards_drl_agent_2, label=r'DRL-SRA$_{ACKTR}$')
+axis[0].plot(tss, rewards_drl_agent_3, label=r'DRL-SRA$_{TRPO}$')
+axis[0].plot(tss, rewards_drl_agent_4, label=r'DRL-SRA$_{ACER}$')
+axis[0].plot(tss, rewards_drl_agent_5, label=r'DRL-SRA$_{DQN}$')
+axis[0].plot(tss, rewards_drl_agent_6, label=r'DRL-SRA$_{PPO1}$')
+axis[0].plot(tss, rewards_drl_agent_7, label=r'DRL-SRA$_{PPO2}$')
 
 for i,v in enumerate(env1.schedulers):
     vrs = []

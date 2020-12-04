@@ -18,5 +18,8 @@ EPSILON = 1e-05
 EPSILON_D = '1e-05'
 
 
-###
-MODELS_FOLDER = 'models/'
+### stationary channel
+MODELS_FOLDER_STATIONARY = 'models/'
+
+### non-stationary channel
+MODELS_FOLDER = 'models_stat/'

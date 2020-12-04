@@ -18,6 +18,8 @@ model5 = DQN(mlpp, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
 model6 = PPO1(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, adam_epsilon=consts.EPSILON)
 model7 = PPO2(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
 tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
+#folder = consts.MODELS_FOLDER_STATIONARY
+folder = consts.MODELS_FOLDER
 for i in tqdm_e:
     #i = 1 if i == 0 else i
     #ts = consts.BLOCKS_EP * i
@@ -25,22 +27,22 @@ for i in tqdm_e:
     base_file = "_gamma_"+consts.GAMMA_D+"_lr_"+consts.LR_D+'_epsilon_'+consts.EPSILON_D
 
     model1.learn(total_timesteps=ts) # time steps
-    model1.save(consts.MODELS_FOLDER+"a2c_drl_"+str(ts)+base_file)
+    model1.save(folder+"a2c_drl_"+str(ts)+base_file)
 
     model2.learn(total_timesteps=ts)
-    model2.save(consts.MODELS_FOLDER+"acktr_"+str(ts)+base_file)
+    model2.save(folder+"acktr_"+str(ts)+base_file)
 
     model3.learn(total_timesteps=ts)
-    model3.save(consts.MODELS_FOLDER+"trpo_"+str(ts)+base_file)
+    model3.save(folder+"trpo_"+str(ts)+base_file)
 
     model4.learn(total_timesteps=ts)
-    model4.save(consts.MODELS_FOLDER+"acer_"+str(ts)+base_file)
+    model4.save(folder+"acer_"+str(ts)+base_file)
 
     model5.learn(total_timesteps=ts)
-    model5.save(consts.MODELS_FOLDER+"dqn_" + str(ts)+base_file)
+    model5.save(folder+"dqn_" + str(ts)+base_file)
 
     model6.learn(total_timesteps=ts)
-    model6.save(consts.MODELS_FOLDER+"ppo1_" + str(ts)+base_file)
+    model6.save(folder+"ppo1_" + str(ts)+base_file)
 
     model7.learn(total_timesteps=ts)
-    model7.save(consts.MODELS_FOLDER+"ppo2_" + str(ts)+base_file)
+    model7.save(folder+"ppo2_" + str(ts)+base_file)
