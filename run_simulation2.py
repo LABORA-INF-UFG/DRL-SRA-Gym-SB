@@ -25,14 +25,14 @@ class NumpyArrayEncoder(JSONEncoder):
 env1 = SRAEnv()
 env1.type = "Master"
 
-simulation_type = "stationary"
-#sumulation_type = "n-stationary"
+#simulation_type = "stationary"
+simulation_type = "n-stationary"
 
 # number of executions per trained models
 t = 100
 
 tqdm_ = "0-200"
-tqdm_e = tqdm(range(0,20,5), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
 obs, rw, endep, info = env1.step_(0)
 obs2 = copy.deepcopy(obs)
 env2 = copy.deepcopy(env1)
@@ -79,7 +79,8 @@ actions_5, actions_6, actions_7 = [], [], []
 c_act_1, c_act_2, c_act_3 = [0] * len(env1.schedulers), [0] * len(env1.schedulers), [0] * len(env1.schedulers)
 c_act_5, c_act_6, c_act_7 = [0] * len(env1.schedulers), [0] * len(env1.schedulers), [0] * len(env1.schedulers)
 tss = []
-folder = consts.MODELS_FOLDER_STATIONARY
+#folder = consts.MODELS_FOLDER_STATIONARY
+folder = consts.MODELS_FOLDER
 
 for i in tqdm_e:
     #i = 1 if i == 0 else i
