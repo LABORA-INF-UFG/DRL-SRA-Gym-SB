@@ -11,11 +11,11 @@ from utils.save_results import SaveResults
 
 
 tqdm_ = "0-200"
-t = 10
+t = 100
 simulation_type = "stationary"
 simulation_type = "n-stationary"
 F = "_F_3-3"
-
+F = ""
 # loading the results
 
 f = 'history/'+simulation_type+ F + '_history_'+ tqdm_ +'_'+str(t)+'_rounds_'+str(consts.BLOCKS_EP)+'_bloks_eps.json'
