@@ -12,7 +12,7 @@ from json import JSONEncoder
 import consts
 import copy
 
-### Simulando com F[3,3]
+### Simulando com F[1,1]
 
 from sra_env.sra_env1 import SRAEnv
 
@@ -28,13 +28,13 @@ env1.type = "Master"
 
 #simulation_type = "stationary"
 simulation_type = "n-stationary"
-F = "_F_3-3"
+F = "_F_1-1"
 
 # number of executions per trained models
 t = 10
 
-tqdm_ = "0-75"
-tqdm_e = tqdm(range(0,75,5), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_ = "0-200"
+tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
 env1.reset()
 obs, rw, endep, info = env1.step_(0)
 obs2 = copy.deepcopy(obs)

@@ -28,7 +28,7 @@ class SRAEnv(gym.Env):
         # The number of elements into the array corresponds to the frequencies available and the number of each
         # element corresponds to the max number of users allocated for each frequency
         #self.F = consts.F
-        self.F = [3,3]
+        self.F = [1,1]
         # Number of slots per Block
         self.slots_block = 2
         # Number of blocks per episode

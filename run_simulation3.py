@@ -34,8 +34,8 @@ F = "_F_3-3_NR" # NR - No repetition - combinatorial action space
 # number of executions per trained models
 t = 10
 
-tqdm_ = "0-20"
-tqdm_e = tqdm(range(0,20,5), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_ = "0-200"
+tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
 env1.reset()
 obs, rw, endep, info = env1.step_(0)
 obs2 = copy.deepcopy(obs)
