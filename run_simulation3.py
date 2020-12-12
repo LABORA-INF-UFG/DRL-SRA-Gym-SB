@@ -32,7 +32,7 @@ simulation_type = "n-stationary"
 F = "_F_3-3_NR" # NR - No repetition - combinatorial action space
 
 # number of executions per trained models
-t = 10
+t = 100
 
 tqdm_ = "0-200"
 tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
@@ -76,7 +76,13 @@ reward_schedulers = []
 pkt_loss_1, pkt_loss_2, pkt_loss_3 = [], [], []
 pkt_loss_4 = []
 pkt_loss_5, pkt_loss_6, pkt_loss_7 = [], [], []
+
+pkt_d_1, pkt_d_2, pkt_d_3 = [], [], []
+pkt_d_4 = []
+pkt_d_5, pkt_d_6, pkt_d_7 = [], [], []
+
 pkt_loss_sch = [[] for i in range(len(env1.schedulers))]
+pkt_delay_sch = [[] for i in range(len(env1.schedulers))]
 actions_1, actions_2, actions_3 = [], [], []
 actions_4 = []
 actions_5, actions_6, actions_7 = [], [], []
@@ -114,15 +120,23 @@ for i in tqdm_e:
     p_pkt_loss_1, p_pkt_loss_2, p_pkt_loss_3 = [], [], []
     p_pkt_loss_4 = []
     p_pkt_loss_5, p_pkt_loss_6, p_pkt_loss_7 = [], [], []
+
+    p_pkt_d_1, p_pkt_d_2, p_pkt_d_3 = [], [], []
+    p_pkt_d_4 = []
+    p_pkt_d_5, p_pkt_d_6, p_pkt_d_7 = [], [], []
+
     #p_pkt_schedulers = [[0.] for i in range(len(env1.schedulers))]
     p_pkt_schedulers = [[] for i in range(len(env1.schedulers))]
+    p_pkt_d_schedulers = [[] for i in range(len(env1.schedulers))]
 
     for ti in range(t):
         rw_drl_a_1, rw_drl_a_2, rw_drl_a_3, rw_drl_a_4, rw_drl_a_5, rw_drl_a_6, rw_drl_a_7 = [], [], [], [], [], [], []
         # rewards for schedulers
         rw_sh = [[0.] for i in range(len(env1.schedulers))]
         pkt_l_sh = [[] for i in range(len(env1.schedulers))]
+        pkt_d_sh = [[] for i in range(len(env1.schedulers))]
         pkt_l_drl_a_1, pkt_l_drl_a_2, pkt_l_drl_a_3, pkt_l_drl_a_4, pkt_l_drl_a_5, pkt_l_drl_a_6, pkt_l_drl_a_7 = [], [], [], [], [], [], []
+        pkt_d_drl_a_1, pkt_d_drl_a_2, pkt_d_drl_a_3, pkt_d_drl_a_4, pkt_d_drl_a_5, pkt_d_drl_a_6, pkt_d_drl_a_7 = [], [], [], [], [], [], []
 
         acts_1, acts_2, acts_3, acts_4, acts_5, acts_6, acts_7 = [], [], [], [], [], [], []
 
@@ -178,37 +192,45 @@ for i in tqdm_e:
 
             # for model1
             rw_drl_a_1.append(rewards_1[0])
-            # the last one is the drl agent pkt loss
+            # index 2 is the drl agent pkt loss
             pkt_l_drl_a_1.append(rewards_1[2][0])
+            pkt_d_drl_a_1.append(np.mean(rewards_1[3][0]))
             # for model2
             rw_drl_a_2.append(rewards_2[0])
             # the last one is the drl agent pkt loss
             pkt_l_drl_a_2.append(rewards_2[2][0])
+            pkt_d_drl_a_2.append(np.mean(rewards_2[3][0]))
             # for model3
             rw_drl_a_3.append(rewards_3[0])
             # the last one is the drl agent pkt loss
             pkt_l_drl_a_3.append(rewards_3[2][0])
+            pkt_d_drl_a_3.append(np.mean(rewards_3[3][0]))
             # for model4
             rw_drl_a_4.append(rewards_4[0])
             # the last one is the drl agent pkt loss
             pkt_l_drl_a_4.append(rewards_4[2][0])
+            pkt_d_drl_a_4.append(np.mean(rewards_4[3][0]))
             # for model5
             rw_drl_a_5.append(rewards_5[0])
             # the last one is the drl agent pkt loss
             pkt_l_drl_a_5.append(rewards_5[2][0])
+            pkt_d_drl_a_5.append(np.mean(rewards_5[3][0]))
             # for model6
             rw_drl_a_6.append(rewards_6[0])
             # the last one is the drl agent pkt loss
             pkt_l_drl_a_6.append(rewards_6[2][0])
+            pkt_d_drl_a_6.append(np.mean(rewards_6[3][0]))
             # for model7
             rw_drl_a_7.append(rewards_7[0])
             # the last one is the drl agent pkt loss
             pkt_l_drl_a_7.append(rewards_7[2][0])
+            pkt_d_drl_a_7.append(np.mean(rewards_7[3][0]))
 
             ## schedulers
             for u,v in enumerate(env1.schedulers):
                 rw_sh[u] += rewards_1[1][u]
                 pkt_l_sh[u].append(rewards_1[2][u+1])
+                pkt_d_sh[u].append(np.mean(rewards_1[3][u + 1]))
 
         # env.render()
         p_rewards_drl_agent_1.append(np.mean(rw_drl_a_1))
@@ -225,6 +247,7 @@ for i in tqdm_e:
             #p_sc.append(rw_sh[i] / len(rw_drl_a_1))
             p_reward_schedulers[i] += rw_sh[i] / len(rw_drl_a_1)
             p_pkt_schedulers[i].append(np.mean(pkt_l_sh[i]))
+            p_pkt_d_schedulers[i].append(np.mean(pkt_d_sh[i]))
         #p_reward_schedulers.append(p_sc)
 
         p_pkt_loss_1.append(np.mean(pkt_l_drl_a_1))
@@ -234,6 +257,14 @@ for i in tqdm_e:
         p_pkt_loss_5.append(np.mean(pkt_l_drl_a_5))
         p_pkt_loss_6.append(np.mean(pkt_l_drl_a_6))
         p_pkt_loss_7.append(np.mean(pkt_l_drl_a_7))
+
+        p_pkt_d_1.append(np.mean(np.mean(pkt_d_drl_a_1)))
+        p_pkt_d_2.append(np.mean(np.mean(pkt_d_drl_a_2)))
+        p_pkt_d_3.append(np.mean(np.mean(pkt_d_drl_a_3)))
+        p_pkt_d_4.append(np.mean(np.mean(pkt_d_drl_a_4)))
+        p_pkt_d_5.append(np.mean(np.mean(pkt_d_drl_a_5)))
+        p_pkt_d_6.append(np.mean(np.mean(pkt_d_drl_a_6)))
+        p_pkt_d_7.append(np.mean(np.mean(pkt_d_drl_a_7)))
 
         actions_1.append(acts_1)
         actions_2.append(acts_2)
@@ -255,6 +286,7 @@ for i in tqdm_e:
     for u,v in enumerate(env1.schedulers):
         p_rs.append(p_reward_schedulers[u] / len(p_rewards_drl_agent_1))
         pkt_loss_sch[u].append(np.mean(p_pkt_schedulers[u]))
+        pkt_delay_sch[u].append(np.mean(p_pkt_d_schedulers[u]))
 
     reward_schedulers.append(p_rs)
 
@@ -265,6 +297,14 @@ for i in tqdm_e:
     pkt_loss_5.append(np.mean(p_pkt_loss_5))
     pkt_loss_6.append(np.mean(p_pkt_loss_6))
     pkt_loss_7.append(np.mean(p_pkt_loss_7))
+
+    pkt_d_1.append(np.mean(p_pkt_d_1))
+    pkt_d_2.append(np.mean(p_pkt_d_2))
+    pkt_d_3.append(np.mean(p_pkt_d_3))
+    pkt_d_4.append(np.mean(p_pkt_d_4))
+    pkt_d_5.append(np.mean(p_pkt_d_5))
+    pkt_d_6.append(np.mean(p_pkt_d_6))
+    pkt_d_7.append(np.mean(p_pkt_d_7))
 
 ## savind results
 history={
@@ -288,10 +328,20 @@ history={
         "PPO2": pkt_loss_7,
     },
     "pkt_loss_schedulers": pkt_loss_sch,
+    "pkt_delay_schedulers": pkt_delay_sch,
+    "pkt_delay_agents":{
+        "A2C": pkt_d_1,
+        "ACKTR": pkt_d_2,
+        "TRPO": pkt_d_3,
+        "ACER": pkt_d_4,
+        "DQN": pkt_d_5,
+        "PPO1": pkt_d_6,
+        "PPO2": pkt_d_7,
+    },
     "tss": tss
 }
 
-with open('history/'+simulation_type+ F +'_history_'+str(tqdm_)+'_'+str(t)+'_rounds_'+str(env1.blocks_ep)+'_bloks_eps.json', 'w') as outfile:
+with open('history/'+simulation_type+ F +'b_history_'+str(tqdm_)+'_'+str(t)+'_rounds_'+str(env1.blocks_ep)+'_bloks_eps.json', 'w') as outfile:
     json.dump(history, outfile, cls=NumpyArrayEncoder)
 #############################
 
