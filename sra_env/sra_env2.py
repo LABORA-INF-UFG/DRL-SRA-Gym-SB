@@ -150,6 +150,7 @@ class SRAEnv(gym.Env):
         reward_schedulers = []
         reward = 0
         pkt_loss = [[] for i in range(len(self.schedulers) + 1)]
+        pkt_delay = [[] for i in range(len(self.schedulers) + 1)]
 
         # rate estimation for all users
         rates = []
@@ -209,6 +210,7 @@ class SRAEnv(gym.Env):
                     rws, dpkts = self.rewardCalcSchedulers(self.mimo_systems, rates_pkt_per_s_schedulers, sc.buffers)
                     reward_schedulers.append(rws)
                     pkt_loss[id + 1].append(dpkts)
+                    pkt_delay[id + 1].append(self.compute_pkt_delay(sc.buffers))
                     # clearing alloc users
                     sc.clear()
                 ####################################################
@@ -226,6 +228,8 @@ class SRAEnv(gym.Env):
                                                    self.min_reward, self.recent_spectral_eff, update=True)
 
             pkt_loss[0].append(dropped_pkt)
+
+            pkt_delay[0].append(self.compute_pkt_delay(self.buffers))
 
             # resetting the allocated users
             self.alloc_users = [[] for i in range(len(self.F))]
@@ -253,7 +257,7 @@ class SRAEnv(gym.Env):
 
         info = {}
         # print("Episode " + str(self.ep_count) + " - Block " + str(self.curr_block))
-        return self.observation_space, [reward, reward_schedulers, pkt_loss], self.end_ep, info
+        return self.observation_space, [reward, reward_schedulers, pkt_loss, pkt_delay], self.end_ep, info
 
     def step__(self,action):
 
@@ -521,3 +525,9 @@ class SRAEnv(gym.Env):
         reward = 10 * (tx_pkts / 50000)
 
         return reward, dropped_pkts_sum
+
+    def compute_pkt_delay(self, buffers):
+        buffer_states = buffers.get_buffer_states()
+        # Oldest packets
+        oldest_packet_per_buffer = buffer_states[1]
+        return oldest_packet_per_buffer

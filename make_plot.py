@@ -14,11 +14,11 @@ tqdm_ = "0-200"
 t = 100
 simulation_type = "stationary"
 simulation_type = "n-stationary"
-F = "_F_3-3"
-F = ""
+F = "_F_3-3_NR"
+#F = ""
 # loading the results
 
-f = 'history/'+simulation_type+ F + '_history_'+ tqdm_ +'_'+str(t)+'_rounds_'+str(consts.BLOCKS_EP)+'_bloks_eps.json'
+f = 'history/'+simulation_type+ F + 'b_history_'+ tqdm_ +'_'+str(t)+'_rounds_'+str(consts.BLOCKS_EP)+'_bloks_eps.json'
 history = SaveResults.load_history(f)
 
 
@@ -40,6 +40,8 @@ pkt_loss_6 = history['pkt_loss_agents']['PPO1']
 pkt_loss_7 = history['pkt_loss_agents']['PPO2']
 
 pkt_loss_sch = history['pkt_loss_schedulers']
+
+pkt_delay_sch = history['pkt_delay_schedulers']
 
 tss = history['tss']
 #############################
@@ -86,5 +88,31 @@ axis2.set_xlabel('Episodes')
 axis2.set_ylabel('Mean pkt loss')
 axis2.set_title('Packet loss per episode')
 axis2.legend()
+
+figure, axis3 = plt.subplots(1)
+
+pkt_d_1 = history['pkt_delay_agents']['A2C']
+pkt_d_2 = history['pkt_delay_agents']['ACKTR']
+pkt_d_3 = history['pkt_delay_agents']['TRPO']
+pkt_d_4 = history['pkt_delay_agents']['ACER']
+pkt_d_5 = history['pkt_delay_agents']['DQN']
+pkt_d_6 = history['pkt_delay_agents']['PPO1']
+pkt_d_7 = history['pkt_delay_agents']['PPO2']
+
+axis3.plot(tss, pkt_d_1, label=r'DRL-SRA$_{A2C}$')
+axis3.plot(tss, pkt_d_2, label=r'DRL-SRA$_{ACKTR}$')
+axis3.plot(tss, pkt_d_3, label=r'DRL-SRA$_{TRPO}$')
+axis3.plot(tss, pkt_d_4, label=r'DRL-SRA$_{ACER}$')
+axis3.plot(tss, pkt_d_5, label=r'DRL-SRA$_{DQN}$')
+axis3.plot(tss, pkt_d_6, label=r'DRL-SRA$_{PPO1}$')
+axis3.plot(tss, pkt_d_7, label=r'DRL-SRA$_{PPO2}$')
+
+for i,v in enumerate(schedulers):
+    axis3.plot(tss, pkt_delay_sch[i], linestyle='dashdot', label=v.name)
+
+axis3.set_xlabel('Episodes')
+axis3.set_ylabel('Mean pkt delay')
+axis3.set_title('Packet delay per episode')
+axis3.legend()
 
 plt.show()
