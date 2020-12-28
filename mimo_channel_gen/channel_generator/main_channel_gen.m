@@ -118,7 +118,7 @@ noiseVariancedBm = -174 + 10*log10(BW) + noiseFigure;
 
 accuracy=2; %1 or 2. 2 is faster but matrices may not be positive-definite
 
-for freq=2:length(freqs)
+for freq=1:length(freqs)
     %% step 1 of stage 1. Here we use the full multicell processing, and we even
     %% estimate channels and SE for BSs other than the target BS
 
