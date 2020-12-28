@@ -17,15 +17,15 @@
 
 clear *
 clf
-main_folder = 'E:\Docs_Doutorado\exp3\validation\';
-mkdir([main_folder 'traffic_interference\'])
+main_folder = 'exp1/'
+mkdir([main_folder 'traffic_interference/'])
 output_file_name_prefix = 'traffic_interference';
 num_episodes = 200;
 num_blocks = 100; %per episode
 %tau_p = 30;  %samples dedicated to pilots in coherence block
 %tau_c = tau_p + 1; %samples in coherence block (samples per frame)
 tau_d = 140;
-BW = 100e6;
+BW = 100e6; %100 MHz - Communication bandwidth
 rate_reduction_factor = 10; %factor to reduce the rate and fit the channel
 
 num_bits_per_packet = 1024; %number of bits per packet from Python
@@ -67,7 +67,7 @@ end
 
 all_lambdas = zeros(K,num_total_samples);
 
-if method == 2 
+if method == 2
 
 for u=1:K
     if u<K/2
@@ -90,8 +90,8 @@ end
 
 for e=1:num_episodes
     disp(['Processing episode ' num2str(e) ' out of ' num2str(num_episodes)])
-    
-    output_file_name = [main_folder 'traffic_interference\' output_file_name_prefix '_e_' num2str(e) '.mat'];
+
+    output_file_name = [main_folder 'traffic_interference/' output_file_name_prefix '_e_' num2str(e) '.mat'];
     
     if method == 1 %fixed rate
         num_pckts = fixed_rate *ones(K,num_total_samples);

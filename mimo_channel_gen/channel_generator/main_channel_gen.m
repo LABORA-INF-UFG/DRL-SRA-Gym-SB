@@ -93,7 +93,7 @@ if 0
         close all
         ak_plot_cells_and_ues(UEpositions, BSpositions)
     end
-    
+
     [K, L]=size(UEpositions);
 end
 
@@ -118,12 +118,12 @@ noiseVariancedBm = -174 + 10*log10(BW) + noiseFigure;
 
 accuracy=2; %1 or 2. 2 is faster but matrices may not be positive-definite
 
-for freq=1:length(freqs)
+for freq=2:length(freqs)
     %% step 1 of stage 1. Here we use the full multicell processing, and we even
     %% estimate channels and SE for BSs other than the target BS
-    
+
     output_file_name_prefix = [output_folder 'channels/channels_f' num2str(freq) '_b' num2str(num_blocks) 'tauc' num2str(tau_c) 'taup' num2str(tau_p)];
-    
+
     if load_pre_computed_files == 1 %simply load pre-computed files
         eval(['load ' output_folder 'R_independent_channels_f' num2str(freq)])
         eval(['load ' output_folder 'channelGaindBOverNoise_f' num2str(freq)])
@@ -142,7 +142,7 @@ for freq=1:length(freqs)
         eval(['save -v6 ' output_folder 'R_independent_channels_f' num2str(freq) ' R']) %save R
         eval(['save -v6 ' output_folder 'channelGaindBOverNoise_f' num2str(freq) ' channelGaindBOverNoise']) %save channelGaindBOverNoise
     end
-    
+
     %[R,channelGaindB] = ak_ita2019_functionExampleSetup2(BSpositions,UEpositions,M,ASDdeg); %only target cell
     %     if 1
     %         [R,channelGaindB] = ak_ita2019_functionExampleSetup3(BSpositions,UEpositions,M,ASDdeg,accuracy); %all cells
@@ -156,38 +156,38 @@ for freq=1:length(freqs)
     %     else
     %         eval(['load R_independent_channels_f' num2str(freq)])
     %     end
-    
-    
+
+
     %note that the outuput R below is scaled by the channel gain (over noise), so
     %it differs from the input R
     %[Hhat_MMSE,C_MMSE,R,H,Hhat_EW_MMSE,C_EW_MMSE,Hhat_LS,C_LS]
     %[Hhat,C_MMSE,tau_p,R,H] = functionChannelEstimates(R,channelGaindBOverNoise,nbrOfRealizationsForEstimation,M,K,L,p,frequency_reuse);
     [Hhat,C_MMSE,R,H] = ak_functionChannelEstimates(R,channelGaindBOverNoise,nbrOfRealizationsForEstimation,M,K,L,p,frequency_reuse,tau_p);
-    
+
     %[Hhat,C_MMSE,H] = ak_ita2019_channel_estimates_all_channels(R,nbrOfRealizationsForEstimation,p,frequency_reuse,tau_p);
     [M,~,K,L,~]=size(R);
-    
+
     %AK-TODO: ak_intercell_interference must take in account the pilot
     %reuse factor. it`s not now
     [gamma_parameters, all_cells_intercell_interference, interferences] = ak_intercell_interference(H,Hhat,target_cell_index);
     target_cell_intercell_interference = all_cells_intercell_interference(:,target_cell_index); %keep only for the target cell
-    
+
     [signal_MR,interf_MR] = functionComputeSINR_DL(H,Hhat,C_MMSE,tau_c,tau_p,nbrOfRealizationsForEstimation,M,K,L,p);
-    
+
     SE_debug = functionComputeSE_DL_poweralloc(rho*ones(K,L),signal_MR,interf_MR,prelogFactor);
-    
+
     clear H Hhat; %no need anymore, already estimated things with independent channels
     if 0 %have to enable due to MMSE precoding, in which C_MMSE is needed
         clear C_MMSE
     end
-    
+
     %% Step 2 of stage 1: channel h realizations and estimations hhat
     %% We need to use all LK channels to the target cell in order to estimate
     %% channels taking in account the pilot contamination. We need both the
     %% LK R correlation matrices and also the LK channels. But after the
     %% channels are estimated, we keep here only the intra-target-cell K channels
     %% We save then only these K channels into files
-    
+
     % We don't need the full 5-d R. Just the channels related to the
     % target cell, so we put them into R_target
     R_target = squeeze(R(:,:,:,:,target_cell_index));
@@ -206,8 +206,8 @@ for freq=1:length(freqs)
             Rsqrt_target(:,:,u,c) = sqrtm(Rtemp);
         end
     end
-    
-    for e=1:num_episodes
+
+    for e=115:num_episodes
         disp(['Processing frequency ' num2str(freqs(freq)) ' GHz, episode ' num2str(e) ' out of ' num2str(num_episodes)])
         
         %now sample the ones corresponding to start of coherence blocks
