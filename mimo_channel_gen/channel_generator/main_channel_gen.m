@@ -207,7 +207,7 @@ for freq=1:length(freqs)
         end
     end
 
-    for e=115:num_episodes
+    for e=1:num_episodes
         disp(['Processing frequency ' num2str(freqs(freq)) ' GHz, episode ' num2str(e) ' out of ' num2str(num_episodes)])
         
         %now sample the ones corresponding to start of coherence blocks
