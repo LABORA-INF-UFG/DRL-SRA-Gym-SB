@@ -62,8 +62,8 @@ freqs = [24, 28];
 gain_factors_dB = [0 8];
 
 % RL episodes
-num_episodes = 200;
-num_blocks = 100; %5*20; %per episode
+num_episodes = 10;
+num_blocks = 10; %5*20; %per episode
 tau_p = 30;  %samples dedicated to pilots in coherence block
 tau_u = 40;
 tau_d = 140;

@@ -30,15 +30,15 @@ if 'PPO1' in sys.argv:
 if 'PPO2' in sys.argv:
     model7 = PPO2(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
 
-tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_e = tqdm(range(100,100100,10000), desc='Time Steps', leave=True, unit=" time steps")
 #folder = consts.MODELS_FOLDER_STATIONARY
 #folder = consts.MODELS_FOLDER
 folder = consts.MODELS_MMW
-F = "_F_3-3_LE" # LE = Less Training Episode data = 30 episodes
+F = "_F_3-3_ME" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100
 for i in tqdm_e:
     #i = 1 if i == 0 else i
-    #ts = consts.BLOCKS_EP * i
-    ts = consts.BLOCKS_EP * (i + 1)
+    ts = consts.BLOCKS_EP * i
+    #ts = consts.BLOCKS_EP * (i + 1)
     base_file = F + "_gamma_"+consts.GAMMA_D+"_lr_"+consts.LR_D+'_epsilon_'+consts.EPSILON_D
 
     if model1:

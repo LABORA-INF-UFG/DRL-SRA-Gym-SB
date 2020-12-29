@@ -7,7 +7,7 @@ MAX_SPECTRAL_EFF = 7.8
 K = 10
 F = [1]
 
-BLOCKS_EP = 100
+BLOCKS_EP = 500
 
 GAMMA = 0.7
 GAMMA_D = '07'
@@ -23,3 +23,5 @@ MODELS_FOLDER_STATIONARY = 'models/'
 
 ### non-stationary channel
 MODELS_FOLDER = 'models_nstat/'
+
+MODELS_MMW = 'models_mmw/'

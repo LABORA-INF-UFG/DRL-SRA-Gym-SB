@@ -19,10 +19,10 @@ model4 = ACER(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=const
 model5 = DQN(mlpp, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
 model6 = PPO1(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, adam_epsilon=consts.EPSILON)
 model7 = PPO2(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
-tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_e = tqdm(range(0,220,5), desc='Time Steps', leave=True, unit=" time steps")
 #folder = consts.MODELS_FOLDER_STATIONARY
 folder = consts.MODELS_FOLDER
-F = "_F_3-3_NR" # NR - No repetition - combinatorial action space
+F = "_F_3-3_NR_ND" # NR - No repetition - combinatorial action space ND - New Data
 for i in tqdm_e:
     #i = 1 if i == 0 else i
     #ts = consts.BLOCKS_EP * i

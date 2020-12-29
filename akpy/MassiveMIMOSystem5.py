@@ -71,10 +71,12 @@ from pathlib import Path
 class MassiveMIMOSystem:
     def __init__(self, K=3, frequency_index=1):
         #depends on dataset
-        # self.num_episodes = 200 ## 200 for new data
+        #self.num_episodes = 200 ## 200 for new data
         self.num_episodes = 30
-        # self.num_blocks_per_episode = 100 ## 100 for new data
-        self.num_blocks_per_episode = 20
+        self.range_episodes_train = [0,99]
+        self.range_episodes_validate = [100,199]
+        self.num_blocks_per_episode = 100 ## 100 for new data
+        #self.num_blocks_per_episode = 20
         self.current_sample_index = 0
         #Select length of coherence block
         #Length of pilot sequences
@@ -89,9 +91,11 @@ class MassiveMIMOSystem:
         #precoding and combining methods: MMSE, MR or RZF
         self.precoding_method = 'MR'
         if os.name == 'nt':
-            self.root_folder = Path.cwd() / 'exp1'
+            #self.root_folder = Path.cwd() / 'exp1'
             #self.root_folder = Path('E:\Docs_Doutorado') / 'exp3'
-            self.root_folder = Path('E:\Docs_Doutorado') / 'exp1_origin'
+            #self.root_folder = Path('E:\Docs_Doutorado') / 'exp1_origin'
+            self.root_folderb = Path('E:\Docs_Doutorado') / 'exp1_origin'
+            self.root_folder = Path('E:\Docs_Doutorado') / 'exp1_f2_mmw'
         else:
             #self.root_folder = '/mnt/c/aksimuls/exp1/'  #laptop
             self.root_folder = Path.cwd() / 'exp1'   #UT PC
@@ -121,8 +125,8 @@ class MassiveMIMOSystem:
         #self.nbrOfRealizations = 10
         ## Propagation parameters
         #Communication bandwidth
-        #self.BW = 100e6 #in Hz
-        self.BW = 20e6  # in Hz
+        self.BW = 100e6 #in Hz
+        #self.BW = 20e6  # in Hz
         #from functionChannelEstimates.m
 
         #Total uplink transmit power per UE (mW)

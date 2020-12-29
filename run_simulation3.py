@@ -29,13 +29,16 @@ env1.type = "Master"
 
 #simulation_type = "stationary"
 simulation_type = "n-stationary"
-F = "_F_3-3_NR" # NR - No repetition - combinatorial action space
+#F = "_F_3-3_NR" # NR - No repetition - combinatorial action space
+F = "_F_3-3_NR_ND" # ND - New Data
 
 # number of executions per trained models
 t = 100
 
 tqdm_ = "0-200"
-tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
+rr = list(range(0,200,5))
+rr.append(1810000)
+tqdm_e = tqdm(rr, desc='Time Steps', leave=True, unit=" time steps")
 env1.reset()
 obs, rw, endep, info = env1.step_(0)
 obs2 = copy.deepcopy(obs)
@@ -96,6 +99,8 @@ for i in tqdm_e:
     #i = 1 if i == 0 else i
     #ts = consts.BLOCKS_EP * i
     ts = consts.BLOCKS_EP * (i + 1)
+    if i > 200:
+        ts = i
     tss.append(ts)
     base_file = F + "_gamma_" + consts.GAMMA_D + "_lr_" + consts.LR_D + '_epsilon_' + consts.EPSILON_D
     ## Loading the trained model for A2C

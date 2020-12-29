@@ -11,10 +11,11 @@ from utils.save_results import SaveResults
 
 
 tqdm_ = "0-200"
-t = 100
+t = 50
 simulation_type = "stationary"
 simulation_type = "n-stationary"
-F = "_F_3-3_NR"
+#F = "_F_3-3_NR"
+F = "_F_3-3_LE" # LE = Less Training Episode data = 30 episodes
 #F = ""
 # loading the results
 

@@ -25,6 +25,7 @@ class SRAEnv(gym.Env):
     def __init__(self):
         self.__version__ = "0.1.0"
         self.type = None
+        self.running_tp = 0 # 0 - trainning; 1 - validating
         self.par_envs = {'Master': [], 'Slave': []}
         self.ep_count = 1
         self.end_ep = False  # Indicate the end of an episode
@@ -72,7 +73,7 @@ class SRAEnv(gym.Env):
 
         # Massive MIMO System
         self.mimo_systems = self.makeMIMO(self.F, self.K)
-        self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F)
+        self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F, tp=0)
 
         self.history_buffers = []
         self.rates = [1.] * self.K
@@ -460,10 +461,18 @@ class SRAEnv(gym.Env):
     def makeMIMO(self, F: list, K: int) -> list:  # Generating MIMO system for each user
         return [MassiveMIMOSystem(K=K, frequency_index=f + 1) for f in range(len(F))]
 
-    def loadEpMIMO(self, mimo_systems: list, F: list) -> list:
-
+    def loadEpMIMO(self, mimo_systems: list, F: list, tp: int) -> list:
+        '''
+        Load static channel data file. tp difine the running type: 0 - training; 1- validating
+        '''
         # calculate the matrices to generate channel estimates
         episode_number = np.random.randint(0, self.mimo_systems[0].num_episodes - 1)
+        # if tp == 0:
+        #     episode_number = np.random.randint(self.mimo_systems[0].range_episodes_train[0],
+        #                                        self.mimo_systems[0].range_episodes_train[1])
+        # else:
+        #     episode_number = np.random.randint(self.mimo_systems[0].range_episodes_validate[0],
+        #                                        self.mimo_systems[0].range_episodes_validate[1])
         for f in range(len(F)):
             # same episode number for all frequencies
             self.mimo_systems[f].load_episode(episode_number)
@@ -485,7 +494,7 @@ class SRAEnv(gym.Env):
             self.buffers.packets_arrival(self.mimo_systems[0].get_current_income_packets())
 
             # MIMO Interference
-            self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F)
+            self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F, tp=self.running_tp)
 
             # reseting the schedulers
             for sc in self.schedulers:
