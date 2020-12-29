@@ -1,0 +1,70 @@
+import gym
+from stable_baselines.common import make_vec_env
+from stable_baselines.common.env_checker import check_env
+from stable_baselines.common.policies import MlpPolicy
+from stable_baselines.deepq.policies import MlpPolicy as mlpp
+from stable_baselines import A2C, ACKTR, TRPO, ACER, DQN, PPO1, PPO2
+from sra_env.sra_env2 import SRAEnv
+from tqdm import tqdm
+import consts
+import sys
+
+
+## training models using combinatorial action space
+
+env = SRAEnv()
+env.running_tp = 0
+model1, model2, model3, model4, model5, model6, model7 = None, None, None, None, None, None, None
+if 'A2C' in sys.argv:
+    model1 = A2C(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR, epsilon=consts.EPSILON)
+if 'ACKTR' in sys.argv:
+    model2 = ACKTR(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
+if 'TRPO' in sys.argv:
+    model3 = TRPO(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, vf_stepsize=consts.LR)
+if 'ACER' in sys.argv:
+    model4 = ACER(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
+if 'DQN' in sys.argv:
+    model5 = DQN(mlpp, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
+if 'PPO1' in sys.argv:
+    model6 = PPO1(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, adam_epsilon=consts.EPSILON)
+if 'PPO2' in sys.argv:
+    model7 = PPO2(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
+
+tqdm_e = tqdm(range(0,200,5), desc='Time Steps', leave=True, unit=" time steps")
+#folder = consts.MODELS_FOLDER_STATIONARY
+#folder = consts.MODELS_FOLDER
+folder = consts.MODELS_MMW
+F = "_F_3-3_LE" # LE = Less Training Episode data = 30 episodes
+for i in tqdm_e:
+    #i = 1 if i == 0 else i
+    #ts = consts.BLOCKS_EP * i
+    ts = consts.BLOCKS_EP * (i + 1)
+    base_file = F + "_gamma_"+consts.GAMMA_D+"_lr_"+consts.LR_D+'_epsilon_'+consts.EPSILON_D
+
+    if model1:
+        model1.learn(total_timesteps=ts) # time steps
+        model1.save(folder+"a2c_drl_"+str(ts)+base_file)
+
+    if model2:
+        model2.learn(total_timesteps=ts)
+        model2.save(folder+"acktr_"+str(ts)+base_file)
+
+    if model3:
+        model3.learn(total_timesteps=ts)
+        model3.save(folder+"trpo_"+str(ts)+base_file)
+
+    if model4:
+        model4.learn(total_timesteps=ts)
+        model4.save(folder+"acer_"+str(ts)+base_file)
+
+    if model5:
+        model5.learn(total_timesteps=ts)
+        model5.save(folder+"dqn_" + str(ts)+base_file)
+
+    if model6:
+        model6.learn(total_timesteps=ts)
+        model6.save(folder+"ppo1_" + str(ts)+base_file)
+
+    if model7:
+        model7.learn(total_timesteps=ts)
+        model7.save(folder+"ppo2_" + str(ts)+base_file)
