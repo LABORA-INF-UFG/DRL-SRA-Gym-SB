@@ -72,7 +72,7 @@ class MassiveMIMOSystem:
     def __init__(self, K=3, frequency_index=1):
         #depends on dataset
         #self.num_episodes = 200 ## 200 for new data
-        self.num_episodes = 30
+        self.num_episodes = 200
         self.range_episodes_train = [0,99]
         self.range_episodes_validate = [100,199]
         self.num_blocks_per_episode = 100 ## 100 for new data
@@ -90,16 +90,8 @@ class MassiveMIMOSystem:
         self.Hhat = None
         #precoding and combining methods: MMSE, MR or RZF
         self.precoding_method = 'MR'
-        if os.name == 'nt':
-            #self.root_folder = Path.cwd() / 'exp1'
-            #self.root_folder = Path('E:\Docs_Doutorado') / 'exp3'
-            #self.root_folder = Path('E:\Docs_Doutorado') / 'exp1_origin'
-            self.root_folderb = Path('E:\Docs_Doutorado') / 'exp1_origin'
-            self.root_folder = Path('E:\Docs_Doutorado') / 'exp1_f2_mmw'
-        else:
-            #self.root_folder = '/mnt/c/aksimuls/exp1/'  #laptop
-            self.root_folder = Path.cwd() / 'exp1'   #UT PC
-        self.file_name_prefix = self.root_folder / 'channels' / ('channels_f' + str(frequency_index) + '_b' + str(self.num_blocks_per_episode) + 'tauc' + str(self.tau_c) + 'taup' + str(self.tau_p) + 'e_')
+        self.root_folder = '/home/victor/exp1_f2_mmw'
+        self.file_name_prefix = self.root_folder + '/channels/' + 'channels_f' + str(frequency_index) + '_b' + str(self.num_blocks_per_episode) + 'tauc' + str(self.tau_c + 'taup' + str(self.tau_p) + 'e_'
 
         #number of connected UEs. Cannot be larger than num_UEs_per_BS
         #to simplify, all cells have same number of UEs. But if
@@ -136,7 +128,7 @@ class MassiveMIMOSystem:
         rho = 100
 
         #load the gamma parameters
-        gamma_file_name = self.root_folder / ('gamma_parameters'+str(frequency_index) + '.mat')#e.g. gamma_parameters1.mat
+        gamma_file_name = self.root_folder + '/gamma_parameters'+str(frequency_index) + '.mat' #e.g. gamma_parameters1.mat
         self.gamma_parameters = read_matlab_array_from_mat(gamma_file_name, 'gamma_parameters')
         self.current_intercell_interference = np.zeros((self.num_UEs_per_BS,))
         #if we serve less users than K, interference should decrease:
@@ -229,7 +221,7 @@ class MassiveMIMOSystem:
         #interf_MMMSE = np.zeros((self.K,self.L,self.K,self.L),dtype=np.complex64)
         interf_MMMSE = np.zeros((self.num_UEs_per_BS, self.L, self.num_UEs_per_BS, self.L)) #real-valued, not complex
 
-        #AK-TODO: make a smarter implementation
+        #AK-TODO: make a smarter implementation	
         number_of_realizations = 0
         for n in realizations_range: #range(self.nbrOfRealizations): #Go through all channel realizations
             number_of_realizations += 1
@@ -699,7 +691,7 @@ class MassiveMIMOSystem:
         #associated to another class, not here
 
         #assume a folder structure such that:
-        file_name = self.root_folder / ('traffic_interference/traffic_interference_e_' + str(episode_number+1) + '.mat')
+        file_name = self.root_folder / ('traffic_interference_2/traffic_interference_e_' + str(episode_number+1) + '.mat')
         arrayNames = ('num_pckts','interference')
         my_list = read_several_matlab_arrays_from_mat(file_name, arrayNames)
         self.num_pckts = my_list[0]
