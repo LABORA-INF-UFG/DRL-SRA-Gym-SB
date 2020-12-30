@@ -9,8 +9,10 @@ Remember to inform the correct simulation data src in ``akpy/MassiveMIMOSystem5.
 
 #### Prerequisites - Ubuntu
 
+###### Tested in Ubuntu 18.04 with Python 3.6.9
+
 ```sh
-$ sudo apt-get update && sudo apt-get install cmake libopenmpi-dev python3-dev zlib1g-dev python-virtualenv
+$ sudo apt-get update && sudo apt-get install cmake libopenmpi-dev python3-dev zlib1g-dev python3-virtualenv python3-pip
 ```
 
 #### Stable Baselines
@@ -31,8 +33,9 @@ $ cd DRL-SRA-Gym-SB
 #### Virtual env
 
 ```sh
-$ sudo pip3 install virtualenv
-$ python3 -m venv /path/to/new/virtual/environment
+$ virtualenv venv ./venv -p python3
 $ source venv/bin/activate
-$ pip install -r requirements.txt
+$ pip install --upgrade pip
+$ pip install scikit-build
+$ pip install -r reqs.txt
 ```
