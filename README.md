@@ -39,3 +39,10 @@ $ pip install --upgrade pip
 $ pip install scikit-build
 $ pip install -r reqs.txt
 ```
+
+Make sure to set up the src of the dataset files (channel and traffic) on 
+[akpy/MassiveMIMOSystem5.py](https://github.com/LABORA-INF-UFG/DRL-SRA-Gym-SB/blob/master/akpy/MassiveMIMOSystem5.py)
+
+You'll be able to run! If You get the message like in the image below, the environment is done! Don't worry about the warnings! 
+
+![Cells](imgs/first-run.png)
