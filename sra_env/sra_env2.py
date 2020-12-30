@@ -466,13 +466,13 @@ class SRAEnv(gym.Env):
         Load static channel data file. tp difine the running type: 0 - training; 1- validating
         '''
         # calculate the matrices to generate channel estimates
-        episode_number = np.random.randint(0, self.mimo_systems[0].num_episodes - 1)
-        # if tp == 0:
-        #     episode_number = np.random.randint(self.mimo_systems[0].range_episodes_train[0],
-        #                                        self.mimo_systems[0].range_episodes_train[1])
-        # else:
-        #     episode_number = np.random.randint(self.mimo_systems[0].range_episodes_validate[0],
-        #                                        self.mimo_systems[0].range_episodes_validate[1])
+        #episode_number = np.random.randint(0, self.mimo_systems[0].num_episodes - 1)
+        if tp == 0:
+            episode_number = np.random.randint(self.mimo_systems[0].range_episodes_train[0],
+                                               self.mimo_systems[0].range_episodes_train[1])
+        else:
+            episode_number = np.random.randint(self.mimo_systems[0].range_episodes_validate[0],
+                                               self.mimo_systems[0].range_episodes_validate[1])
         for f in range(len(F)):
             # same episode number for all frequencies
             self.mimo_systems[f].load_episode(episode_number)
