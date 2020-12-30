@@ -691,7 +691,7 @@ class MassiveMIMOSystem:
         #associated to another class, not here
 
         #assume a folder structure such that:
-        file_name = self.root_folder + 'traffic_interference_2/traffic_interference_e_' + str(episode_number+1) + '.mat'
+        file_name = self.root_folder + '/traffic_interference_2/traffic_interference_e_' + str(episode_number+1) + '.mat'
         arrayNames = ('num_pckts','interference')
         my_list = read_several_matlab_arrays_from_mat(file_name, arrayNames)
         self.num_pckts = my_list[0]
