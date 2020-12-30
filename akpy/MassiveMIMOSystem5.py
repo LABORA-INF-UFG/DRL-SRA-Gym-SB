@@ -91,7 +91,7 @@ class MassiveMIMOSystem:
         #precoding and combining methods: MMSE, MR or RZF
         self.precoding_method = 'MR'
         self.root_folder = '/home/victor/exp1_f2_mmw'
-        self.file_name_prefix = self.root_folder + '/channels/' + 'channels_f' + str(frequency_index) + '_b' + str(self.num_blocks_per_episode) + 'tauc' + str(self.tau_c + 'taup' + str(self.tau_p) + 'e_'
+        self.file_name_prefix = self.root_folder + '/channels/' + 'channels_f' + str(frequency_index) + '_b' + str(self.num_blocks_per_episode) + 'tauc' + str(self.tau_c) + 'taup' + str(self.tau_p) + 'e_'
 
         #number of connected UEs. Cannot be larger than num_UEs_per_BS
         #to simplify, all cells have same number of UEs. But if
@@ -691,7 +691,7 @@ class MassiveMIMOSystem:
         #associated to another class, not here
 
         #assume a folder structure such that:
-        file_name = self.root_folder / ('traffic_interference_2/traffic_interference_e_' + str(episode_number+1) + '.mat')
+        file_name = self.root_folder + 'traffic_interference_2/traffic_interference_e_' + str(episode_number+1) + '.mat'
         arrayNames = ('num_pckts','interference')
         my_list = read_several_matlab_arrays_from_mat(file_name, arrayNames)
         self.num_pckts = my_list[0]
