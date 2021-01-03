@@ -90,7 +90,7 @@ class MassiveMIMOSystem:
         self.Hhat = None
         #precoding and combining methods: MMSE, MR or RZF
         self.precoding_method = 'MR'
-        self.root_folder = '/home/victor/exp1_f2_mmw'
+        self.root_folder = 'E:/Docs_Doutorado/exp1_f2_mmw'
         self.file_name_prefix = self.root_folder + '/channels/' + 'channels_f' + str(frequency_index) + '_b' + str(self.num_blocks_per_episode) + 'tauc' + str(self.tau_c) + 'taup' + str(self.tau_p) + 'e_'
 
         #number of connected UEs. Cannot be larger than num_UEs_per_BS
