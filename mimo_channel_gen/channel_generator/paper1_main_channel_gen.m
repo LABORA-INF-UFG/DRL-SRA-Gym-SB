@@ -43,21 +43,20 @@ if this_scenario  == 1 %use_19_hexagonal == 1
     frequency_reuse=3; %frequency reuse, adopt 1 in case of complete reuse or L for no reuse
     K=10; %# users
     M=64; %should read from PAR.bs_antenna_per_sector = 64;
-    ASDdeg=10;
 elseif this_scenario == 2
     target_cell_index=6; %target cell, 1 for L=19 and 6 for L=16
     L=16;
     frequency_reuse=2; %frequency reuse, adopt 1 in case of complete reuse or L for no reuse
     K=10; %# users
     M=64; %should read from PAR.bs_antenna_per_sector = 64;
-    ASDdeg=25;
+    %ASDdeg=25;
 elseif this_scenario == 3
     target_cell_index=1; %target cell, 1 for L=19 and 6 for L=16
     L=7;
     frequency_reuse=1; %frequency reuse, adopt 1 in case of complete reuse or L for no reuse
     K=3; %# users
     M=8; %should read from PAR.bs_antenna_per_sector = 64;
-    ASDdeg=10;
+    %ASDdeg=10;
 end
 
 %Note that if M is large and ASDdeg small, the R matrices may be non positive
@@ -65,10 +64,11 @@ end
 freqs = [2.1, 28];
 gain_factors_dB = [0 0]; %function ak_ita2019...Setup4.m takes care of this now
 BWs=[20 100e6]; %20 and 100 MHz - Communication bandwidth
+ASDdegs=[10 5]; %degrees
 
 % RL episodes
 num_episodes = 1000;
-num_blocks = 2; %5*20; %per episode
+num_blocks = 10; %5*20; %per episode
 tau_p = 30;  %samples dedicated to pilots in coherence block
 tau_u = 40;
 tau_d = 140;
@@ -126,6 +126,7 @@ for freq=1:length(freqs)
     %% estimate channels and SE for BSs other than the target BS
     %Compute noise power
     noiseVariancedBm = psdNoiseLevels(freq) + 10*log10(BWs(freq)) + noiseFigures(freq);
+    ASDdeg = ASDdegs(freq);
 
     output_file_name_prefix = [output_folder 'channels/channels_f' num2str(freq) '_b' num2str(num_blocks) 'tauc' num2str(tau_c) 'taup' num2str(tau_p)];
 
