@@ -29,7 +29,7 @@ rng(31);
 %addpath('/MATLAB Drive/massivemimobook-master/Code','-end')
 %addpath('massivemimobook-master/Code','-end')
 addpath(fullfile(pwd, '/massivemimobook-master/Code'),'-end')
-output_folder = 'exp3/'; %end with /
+output_folder = 'exp001/'; %end with /
 mkdir(output_folder)
 
 run_time_evolution_analysis = 0; %plot and pause

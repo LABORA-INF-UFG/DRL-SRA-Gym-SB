@@ -22,14 +22,15 @@ should_plot_UE_number = 1;
 
 %edit set_parameters_outdoor_channels
 
-root_path = fullfile(pwd, '/')
+%root_path = fullfile(pwd, '/')
+root_path = fullfile('..', '/');
 
 shouldPlot = 1;
 numEpisodes = 1; %use 1 if it's for fixed wireless
 numChannelRealizationsPerEpisode = 1;  %2500 leads to a 5 GB file and -v6 has a limit of 2 GB
 addpath([root_path '802_16_outdoor/mainFolder'],'-end')
 %addpath([root_path '802_11_indoor'],'-end')
-addpath([root_path 'Correlation_Multiple_Cluster'],'-end') %AK add to path
+%addpath([root_path 'Correlation_Multiple_Cluster'],'-end') %AK add to path
 addpath([root_path '802_16_outdoor/genMSlocations'],'-end') %AK add to path
 if shouldPlot == 1
     %plot cells

@@ -1,4 +1,4 @@
-function [R,channelGaindB] = ak_ita2019_functionExampleSetup4(BSpositions,UEpositions,M,ASDdeg,accuracy)
+function [R,channelGaindB] = ak_ita2019_functionExampleSetup4(BSpositions,UEpositions,M,ASDdeg,accuracy, frequency_index)
 %% This one does not normalize here. It normalizes outside
 % AK: this function computes gain for all L^2 K UEs. It also disables wrapping given that I am using hexagons not rectangles
 %the previous one assumed the target cell is the first 1 and saves computations with
@@ -6,7 +6,8 @@ function [R,channelGaindB] = ak_ita2019_functionExampleSetup4(BSpositions,UEposi
 %Using to generate channel statistiscs
 
 %addpath('/MATLAB Drive/massivemimobook-master/Code','-end')
-addpath(fullfile(pwd, '/massivemimobook-master/Code'),'-end')
+%addpath(fullfile(pwd, '/massivemimobook-master/Code'),'-end') %AK: already
+%in PATH
 
 %rng(15);
 
@@ -58,24 +59,26 @@ K=size(UEpositions,1);
 
 %% Model parameters
 
-if 1
-    %Pathloss exponent
-    alpha = 3.76;
-    
-    %Average channel gain in dB at a reference distance of 1 meter. Note that
-    %-35.3 dB corresponds to -148.1 dB at 1 km, using pathloss exponent 3.76
-    constantTerm = -35.3;
-else
-    %Pathloss exponent
-    alpha = 6;
-    
-    %Average channel gain in dB at a reference distance of 1 meter. Note that
-    %-35.3 dB corresponds to -148.1 dB at 1 km, using pathloss exponent 3.76
-    constantTerm = -15.3;
-end
-
 %Standard deviation of shadow fading
-sigma_sf = 8;
+sigmas_sf = [6 9.7];
+alphas = [3.76 3.4]; %beta in paper
+constantTerms = [41.4 61.4];
+
+alpha=alphas(frequency_index);
+constantTerm = constantTerms(frequency_index);
+sigma_sf = sigmas_sf(frequency_index);
+%Pathloss exponent
+%alpha = 3.76;   
+    %Average channel gain in dB at a reference distance of 1 meter. Note that
+    %-35.3 dB corresponds to -148.1 dB at 1 km, using pathloss exponent 3.76
+    %constantTerm = -35.3;
+    %Pathloss exponent
+    %alpha = 6;   
+    %Average channel gain in dB at a reference distance of 1 meter. Note that
+    %-35.3 dB corresponds to -148.1 dB at 1 km, using pathloss exponent 3.76
+    %constantTerm = -15.3;
+%end
+
 
 %Minimum distance between BSs and UEs
 %minDistance = 35;
@@ -154,7 +157,7 @@ for l = 1:L
         %disp(['UE ' num2str(k)])
         %Generate shadow fading realizations
         shadowing = sigma_sf*randn(1,1,L);
-        channelGainShadowing = channelGaindB(k,l,:) + shadowing;
+        channelGainShadowing = channelGaindB(k,l,:) - shadowing; %could be + too given the zero-mean gaussian
         
         %Check if another BS has a larger average channel gain to the UE
         %than BS l
