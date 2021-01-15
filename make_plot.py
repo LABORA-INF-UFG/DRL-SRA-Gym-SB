@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+import math
 import csv
 import json
 import consts
@@ -9,17 +10,21 @@ from schedulers.proportional_fair import ProportionalFair
 from schedulers.round_robin import RoundRobin
 from utils.save_results import SaveResults
 
-
-tqdm_ = "0-200"
-t = 50
+LR = 0.007
+LR_D= '007'
+tqdm_ = "10-100000"
+t = 500
 simulation_type = "stationary"
 simulation_type = "n-stationary"
 #F = "_F_3-3_NR"
-F = "_F_3-3_LE" # LE = Less Training Episode data = 30 episodes
+F = "_F_3-3_ME" # LE = Less Training Episode data = 30 episodes
+#F = "_F_3-3_ME" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100
 #F = ""
+#F = "_F_3-3_ME_TI_2" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic int
 # loading the results
 
-f = 'history/'+simulation_type+ F + 'b_history_'+ tqdm_ +'_'+str(t)+'_rounds_'+str(consts.BLOCKS_EP)+'_bloks_eps.json'
+f = 'history_final/'+simulation_type+ F + '_history_'+ tqdm_ +'_'+str(t)+'_rounds_'+str(consts.BLOCKS_EP)+\
+    '_bloks_eps_lr_'+ LR_D +'.json'
 history = SaveResults.load_history(f)
 
 
@@ -53,13 +58,20 @@ schedulers.append(ProportionalFair(K=0, F=[0], buffers=None))
 schedulers.append(MaxTh(K=0, F=[0], buffers=None))
 
 figure, axis = plt.subplots(1)
-axis.plot(tss, rewards_drl_agent_1, label=r'DRL-SRA$_{A2C}$')
-axis.plot(tss, rewards_drl_agent_2, label=r'DRL-SRA$_{ACKTR}$')
-axis.plot(tss, rewards_drl_agent_3, label=r'DRL-SRA$_{TRPO}$')
-axis.plot(tss, rewards_drl_agent_4, label=r'DRL-SRA$_{ACER}$')
-axis.plot(tss, rewards_drl_agent_5, label=r'DRL-SRA$_{DQN}$')
-axis.plot(tss, rewards_drl_agent_6, label=r'DRL-SRA$_{PPO1}$')
-axis.plot(tss, rewards_drl_agent_7, label=r'DRL-SRA$_{PPO2}$')
+if len(rewards_drl_agent_1) > 0 and ~math.isnan(rewards_drl_agent_1[0]):
+    axis.plot(tss, rewards_drl_agent_1, label=r'DRL-SRA$_{A2C}$')
+if len(rewards_drl_agent_2) > 0 and not math.isnan(rewards_drl_agent_2[0]):
+    axis.plot(tss, rewards_drl_agent_2, label=r'DRL-SRA$_{ACKTR}$')
+if len(rewards_drl_agent_3) > 0 and not math.isnan(rewards_drl_agent_3[0]):
+    axis.plot(tss, rewards_drl_agent_3, label=r'DRL-SRA$_{TRPO}$')
+if len(rewards_drl_agent_4) > 0 and not math.isnan(rewards_drl_agent_4[0]):
+    axis.plot(tss, rewards_drl_agent_4, label=r'DRL-SRA$_{ACER}$')
+if len(rewards_drl_agent_5) > 0 and not math.isnan(rewards_drl_agent_5[0]):
+    axis.plot(tss, rewards_drl_agent_5, label=r'DRL-SRA$_{DQN}$')
+if len(rewards_drl_agent_6) > 0 and not math.isnan(rewards_drl_agent_6[0]):
+    axis.plot(tss, rewards_drl_agent_6, label=r'DRL-SRA$_{PPO1}$')
+if len(rewards_drl_agent_7) > 0 and not math.isnan(rewards_drl_agent_7[0]):
+    axis.plot(tss, rewards_drl_agent_7, label=r'DRL-SRA$_{PPO2}$')
 
 for i,v in enumerate(schedulers):
     vrs = []
@@ -67,27 +79,34 @@ for i,v in enumerate(schedulers):
         vrs.append(rs[i])
     axis.plot(tss, vrs, linestyle='dashdot', label=v.name)
 
-axis.set_xlabel('Episodes')
-axis.set_ylabel('Mean Sum-rate')
-axis.set_title('Sum-rate per episode')
+axis.set_xlabel('Training episodes')
+axis.set_ylabel('Mean sum-rate (Mbps)')
+#axis.set_title('Sum-rate per episode')
 axis.legend()
 
 figure, axis2 = plt.subplots(1)
 
-axis2.plot(tss, pkt_loss_1, label=r'DRL-SRA$_{A2C}$')
-axis2.plot(tss, pkt_loss_2, label=r'DRL-SRA$_{ACKTR}$')
-axis2.plot(tss, pkt_loss_3, label=r'DRL-SRA$_{TRPO}$')
-axis2.plot(tss, pkt_loss_4, label=r'DRL-SRA$_{ACER}$')
-axis2.plot(tss, pkt_loss_5, label=r'DRL-SRA$_{DQN}$')
-axis2.plot(tss, pkt_loss_6, label=r'DRL-SRA$_{PPO1}$')
-axis2.plot(tss, pkt_loss_7, label=r'DRL-SRA$_{PPO2}$')
+if len(pkt_loss_1) > 0 and not math.isnan(pkt_loss_1[0]):
+    axis2.plot(tss, pkt_loss_1, label=r'DRL-SRA$_{A2C}$')
+if len(pkt_loss_2) > 0 and not math.isnan(pkt_loss_2[0]):
+    axis2.plot(tss, pkt_loss_2, label=r'DRL-SRA$_{ACKTR}$')
+if len(pkt_loss_3) > 0 and not math.isnan(pkt_loss_3[0]):
+    axis2.plot(tss, pkt_loss_3, label=r'DRL-SRA$_{TRPO}$')
+if len(pkt_loss_4) > 0 and not math.isnan(pkt_loss_4[0]):
+    axis2.plot(tss, pkt_loss_4, label=r'DRL-SRA$_{ACER}$')
+if len(pkt_loss_5) > 0 and not math.isnan(pkt_loss_5[0]):
+    axis2.plot(tss, pkt_loss_5, label=r'DRL-SRA$_{DQN}$')
+if len(pkt_loss_6) > 0 and not math.isnan(pkt_loss_6[0]):
+    axis2.plot(tss, pkt_loss_6, label=r'DRL-SRA$_{PPO1}$')
+if len(pkt_loss_7) > 0 and not math.isnan(pkt_loss_7[0]):
+    axis2.plot(tss, pkt_loss_7, label=r'DRL-SRA$_{PPO2}$')
 
 for i,v in enumerate(schedulers):
     axis2.plot(tss, pkt_loss_sch[i], linestyle='dashdot', label=v.name)
 
-axis2.set_xlabel('Episodes')
-axis2.set_ylabel('Mean pkt loss')
-axis2.set_title('Packet loss per episode')
+axis2.set_xlabel('Training episodes')
+axis2.set_ylabel('Mean packet loss')
+#axis2.set_title('Packet loss per episode')
 axis2.legend()
 
 figure, axis3 = plt.subplots(1)
@@ -100,20 +119,27 @@ pkt_d_5 = history['pkt_delay_agents']['DQN']
 pkt_d_6 = history['pkt_delay_agents']['PPO1']
 pkt_d_7 = history['pkt_delay_agents']['PPO2']
 
-axis3.plot(tss, pkt_d_1, label=r'DRL-SRA$_{A2C}$')
-axis3.plot(tss, pkt_d_2, label=r'DRL-SRA$_{ACKTR}$')
-axis3.plot(tss, pkt_d_3, label=r'DRL-SRA$_{TRPO}$')
-axis3.plot(tss, pkt_d_4, label=r'DRL-SRA$_{ACER}$')
-axis3.plot(tss, pkt_d_5, label=r'DRL-SRA$_{DQN}$')
-axis3.plot(tss, pkt_d_6, label=r'DRL-SRA$_{PPO1}$')
-axis3.plot(tss, pkt_d_7, label=r'DRL-SRA$_{PPO2}$')
+if len(pkt_d_1) > 0 and not math.isnan(pkt_d_1[0]):
+    axis3.plot(tss, pkt_d_1, label=r'DRL-SRA$_{A2C}$')
+if len(pkt_d_2) > 0 and not math.isnan(pkt_d_2[0]):
+    axis3.plot(tss, pkt_d_2, label=r'DRL-SRA$_{ACKTR}$')
+if len(pkt_d_3) > 0 and not math.isnan(pkt_d_3[0]):
+    axis3.plot(tss, pkt_d_3, label=r'DRL-SRA$_{TRPO}$')
+if len(pkt_d_4) > 0 and not math.isnan(pkt_d_4[0]):
+    axis3.plot(tss, pkt_d_4, label=r'DRL-SRA$_{ACER}$')
+if len(pkt_d_5) > 0 and not math.isnan(pkt_d_5[0]):
+    axis3.plot(tss, pkt_d_5, label=r'DRL-SRA$_{DQN}$')
+if len(pkt_d_6) > 0 and not math.isnan(pkt_d_6[0]):
+    axis3.plot(tss, pkt_d_6, label=r'DRL-SRA$_{PPO1}$')
+if len(pkt_d_7) > 0 and not math.isnan(pkt_d_7[0]):
+    axis3.plot(tss, pkt_d_7, label=r'DRL-SRA$_{PPO2}$')
 
 for i,v in enumerate(schedulers):
     axis3.plot(tss, pkt_delay_sch[i], linestyle='dashdot', label=v.name)
 
-axis3.set_xlabel('Episodes')
-axis3.set_ylabel('Mean pkt delay')
-axis3.set_title('Packet delay per episode')
+axis3.set_xlabel('Training episodes')
+axis3.set_ylabel('Mean packet delay')
+#axis3.set_title('Packet delay per episode')
 axis3.legend()
 
 plt.show()
