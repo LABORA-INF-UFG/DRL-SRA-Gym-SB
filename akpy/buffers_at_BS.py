@@ -81,10 +81,14 @@ class Buffers:
     def get_dropped_last_iteration(self):
         return self.dropped_last_iteration
 
+    def get_dropped_last_iteration_percent(self):
+        return self.dropped_last_iteration_percentual
+
     def packets_arrival(self, num_incoming_packets):
         num_incoming_packets = num_incoming_packets.flatten()
         self.time_counter += 1 #update the counter
         self.dropped_last_iteration = np.zeros((self.num_buffers,), np.uint64)
+        self.dropped_last_iteration_percentual = np.zeros((self.num_buffers,), np.float)
         for i in range(self.num_buffers):
             space_available = self.buffer_sizes[i] - self.buffer_occupancies[i]
             #check if there is space
@@ -106,6 +110,8 @@ class Buffers:
                 #there is no space for all packets, discard some upcoming packets
                 self.dropped_last_iteration[i] = num_incoming_packets[i] - added_packets
                 self.dropped_counter[i] += self.dropped_last_iteration[i]
+                #computing the percentual of discarded packets
+                self.dropped_last_iteration_percentual[i] = self.dropped_last_iteration[i] / num_incoming_packets[i]
 
     def oldest_packet_per_buffer(self):
         '''
