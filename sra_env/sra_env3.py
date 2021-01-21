@@ -224,11 +224,11 @@ class SRAEnv(gym.Env):
             self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
                                                           self.recent_spectral_eff, self.curr_slot)
 
-            reward, dropped_pkt = self.rewardCalc(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_slot,
+            reward, dropped_pkt, dropped_pkts_percent_mean = self.rewardCalc(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_slot,
                                                    self.packet_size_bits, [self.rates_pkt_per_s, rates], self.buffers,
                                                    self.min_reward, self.recent_spectral_eff, update=True)
 
-            pkt_loss[0].append(dropped_pkt)
+            pkt_loss[0].append(dropped_pkts_percent_mean)
 
             pkt_delay[0].append(self.compute_pkt_delay(self.buffers))
 
@@ -349,7 +349,7 @@ class SRAEnv(gym.Env):
 
             reward = 10 * (tx_pkts / 50000) - 100 * (dropped_pkts_sum / (tx_pkts + 1))
         else:
-            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlow(pkt_rate[0],
+            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean) = self.pktFlow(pkt_rate[0],
                                                                                                      buffers,
                                                                                                      mimo_systems)
             reward = 10 * (tx_pkts / 50000)
@@ -357,7 +357,7 @@ class SRAEnv(gym.Env):
         if reward < 0:
             reward = self.min_reward if reward < self.min_reward else reward  # Impose a minimum vale for reward
 
-        return reward, dropped_pkts_sum
+        return reward, dropped_pkts_sum, dropped_pkts_percent_mean
 
     def rewardCalc_(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int, packet_size_bits: int,
                    pkt_rate, buffers: Buffers, min_reward: int, SE: list, update) -> float:  # Calculating reward value
@@ -466,16 +466,20 @@ class SRAEnv(gym.Env):
     # calculation of packets transmission and reception (from transmit_and_receive_new_packets function)
     def pktFlow(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
                 float, float, float, float, float, list):
+        present_flow = buffers.buffer_occupancies
         available_rate = np.floor(pkt_rate).astype(int)
         t_pkts = available_rate if (np.sum(available_rate) == 0) else buffers.packets_departure(
             available_rate)  # transmission pkts
         dropped_pkts = buffers.get_dropped_last_iteration()
         dropped_pkts_sum = np.sum(dropped_pkts)
+        # getting the percentual dropped of the incoming packages
+        dropped_pkts_percent = buffers.get_dropped_last_iteration_percent()
+        dropped_pkts_percent_mean = np.mean(dropped_pkts_percent)
         incoming_pkts = mimo_systems[0].get_current_income_packets()
         buffers.packets_arrival(incoming_pkts)  # Updating Buffer
         tx_pkts = np.sum(t_pkts)
 
-        return (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers)
+        return (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean)
 
     def makeMIMO(self, F: list, K: int) -> list:  # Generating MIMO system for each user
         return [MassiveMIMOSystem(K=K, frequency_index=f + 1) for f in range(len(F))]
@@ -546,13 +550,12 @@ class SRAEnv(gym.Env):
 
     def rewardCalcSchedulers(self, mimo_systems: list, pkt_rate, buffers: Buffers) -> float:  # Calculating reward value
 
-        (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlow(pkt_rate,
-                                                                                                 buffers,
-                                                                                                 mimo_systems)
+        (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers,
+         dropped_pkts_percent_mean) = self.pktFlow(pkt_rate, buffers, mimo_systems)
 
         reward = 10 * (tx_pkts / 50000)
 
-        return reward, dropped_pkts_sum
+        return reward, dropped_pkts_percent_mean
 
     def compute_pkt_delay(self, buffers):
         buffer_states = buffers.get_buffer_states()
