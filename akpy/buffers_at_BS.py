@@ -40,6 +40,10 @@ class Buffers:
         self.dropped_counter =  np.zeros((self.num_buffers,),np.uint64) #cummulative drops
         self.dropped_last_iteration = np.zeros((self.num_buffers,),np.uint64) #instantaneous drops
 
+        # for buffer history
+        self.buffer_history_incoming = [[0.] for i in range(self.num_buffers)]
+        self.buffer_history_dropped = [[0.] for i in range(self.num_buffers)]
+
     def create_buffers_same_size(self, buffer_size):
         self.create_buffers(buffer_size * np.ones((self.num_buffers,),np.uint64))
 
@@ -113,6 +117,8 @@ class Buffers:
                 #computing the percentual of discarded packets
                 self.dropped_last_iteration_percentual[i] = self.dropped_last_iteration[i] / num_incoming_packets[i]
 
+        self.save_history(num_incoming_packets, self.dropped_last_iteration)
+
     def oldest_packet_per_buffer(self):
         '''
         For each buffer, return for the oldest packet, its number of time instants buffered
@@ -151,6 +157,11 @@ class Buffers:
 
     def get_buffer_states(self):
         return (self.buffer_occupancies, self.oldest_packet_per_buffer())
+
+    def save_history(self, num_incoming_packets, dropped):
+        for i in range(self.num_buffers):
+            self.buffer_history_incoming[i] += num_incoming_packets[i]
+            self.buffer_history_dropped[i] += dropped[i]
 
 if __name__ == '__main__':
     #test buffers with 3 arrivals and 1 departure
