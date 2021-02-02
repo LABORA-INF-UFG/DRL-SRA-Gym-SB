@@ -10,6 +10,9 @@ import consts
 import sys
 import os
 
+'''
+run "traditional" training. Main4 > run_simulation_final > make_plot_final
+'''
 
 ## training models using combinatorial action space
 
@@ -31,13 +34,25 @@ if 'PPO1' in sys.argv:
 if 'PPO2' in sys.argv:
     model7 = PPO2(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
 
-tqdm_e = tqdm(range(300100,400100,10000), desc='Time Steps', leave=True, unit=" time steps")
+#tqdm_e = tqdm(range(10,100011,50000), desc='Time Steps', leave=True, unit=" time steps")
 #folder = consts.MODELS_FOLDER_STATIONARY
 #folder = consts.MODELS_FOLDER
-folder = consts.MODELS_MMW
+
+rr = list(range(1000,100001,1000))
+rr.append(10)
+rr.sort()
+tqdm_e = tqdm(rr, desc='Time Steps', leave=True, unit=" time steps")
+
+#folder = consts.MODELS_FINAL
+folder = 'trained_models/'
 if not os.path.exists(folder):
     os.makedirs(folder)
-F = "_F_3-3_ME" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100
+#F = "_F_3-3_ME_TI_2" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic int
+# low using load factor = 2
+# low 2 using load factor = 8
+#F = "_F_1-1_ME_TI_low1" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic interference
+F = "_F_" + consts.F_D + "_high"
+
 for i in tqdm_e:
     #i = 1 if i == 0 else i
     #ts = consts.BLOCKS_EP * i

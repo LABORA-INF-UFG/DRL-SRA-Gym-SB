@@ -37,14 +37,18 @@ simulation_type = "n-stationary"
 #F = "_F_3-3_LE" # LE = Less Training Episode data = 30 episodes
 #F = "_F_3-3_ME" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100
 #F = "_F_3-3_ME_TI_mixed" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic int
-F = "_F_2-2_ME"
+#F = "_F_2-2_ME"
+#F = "_F_1-1_ME_TI_low1"
+F = "_F_" + consts.F_D + "_low_v4"
 
 # number of executions/episodes per trained models
 t = 50
 
-tqdm_ = "10-100000"
-rr = list(range(10000,100100,10000))
+tqdm_ = "10-30000"
+rr = list(range(1000,24010,1000))
+#rr = list(range(10000,50001,10000))
 rr.append(10)
+#rr.append(101000)
 rr.sort()
 tqdm_e = tqdm(rr, desc='Time Steps', leave=True, unit=" time steps")
 
@@ -108,7 +112,8 @@ c_act_5, c_act_6, c_act_7 = [0] * len(env1.schedulers), [0] * len(env1.scheduler
 tss = []
 #folder = consts.MODELS_FOLDER_STATIONARY
 #folder = consts.MODELS_FOLDER
-folder = consts.MODELS_FINAL
+#folder = consts.MODELS_FINAL
+folder = 'trained_models_3/'
 
 for i in tqdm_e:
     ts = i

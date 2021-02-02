@@ -82,8 +82,8 @@ class SRAEnv(gym.Env):
         # creating the Round Robin scheduler instance with independent buffers
         self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
         # another scheduler instance, for testing with multiple schedulers
-        self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
-        self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
 
         obs = self.reset()
         self.observation_space = spaces.Box(low=0,high=1,shape=obs.shape,dtype=np.float32)
@@ -118,7 +118,7 @@ class SRAEnv(gym.Env):
         self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
                                                       self.recent_spectral_eff, self.curr_slot)
 
-        reward, _ = self.rewardCalc(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_slot,
+        reward, _, _ = self.rewardCalc(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_slot,
                         self.packet_size_bits, [self.rates_pkt_per_s, rates], self.buffers,
                         self.min_reward, self.recent_spectral_eff, update=True)
 

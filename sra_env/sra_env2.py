@@ -34,8 +34,8 @@ class SRAEnv(gym.Env):
         self.c_users = np.zeros(self.K)
         # The number of elements into the array corresponds to the frequencies available and the number of each
         # element corresponds to the max number of users allocated for each frequency
-        #self.F = consts.F
-        self.F = [3, 3]
+        self.F = consts.F
+        #self.F = [1, 1]
         ## getting combinatorial actions
         self.actions = ActionSpace.get_action_space(K=self.K,F=self.F)
         self.action_space = spaces.Discrete(len(self.actions))
@@ -341,6 +341,25 @@ class SRAEnv(gym.Env):
         return self.observation_space, [reward, reward_schedulers, pkt_loss], self.end_ep, info
 
     def rewardCalc(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int, packet_size_bits: int,
+                   pkt_rate, buffers: Buffers, min_reward: int, SE: list, update) -> float:  # Calculating reward value
+        if not update:
+            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlowNoUpdate(pkt_rate[0],
+                                                                                                             buffers,
+                                                                                                             mimo_systems)
+
+            reward = 10 * (tx_pkts / 50000) - 100 * (dropped_pkts_sum / (tx_pkts + 1))
+        else:
+            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlow(pkt_rate[0],
+                                                                                                     buffers,
+                                                                                                     mimo_systems)
+            reward = 10 * (tx_pkts / 50000)
+
+        if reward < 0:
+            reward = self.min_reward if reward < self.min_reward else reward  # Impose a minimum vale for reward
+
+        return reward, dropped_pkts_sum
+
+    def rewardCalc_(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int, packet_size_bits: int,
                    pkt_rate, buffers: Buffers, min_reward: int, SE: list, update) -> float:  # Calculating reward value
         if not update:
             (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlowNoUpdate(pkt_rate[0],
