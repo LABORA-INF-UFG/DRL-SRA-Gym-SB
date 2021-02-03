@@ -21,7 +21,9 @@ clear *
 
 rng(31);
 %addpath('/MATLAB Drive/massivemimobook-master/Code','-end')
-addpath(fullfile(pwd, '/massivemimobook-master/Code'),'-end')
+%addpath(fullfile(pwd, '/massivemimobook-master/Code'),'-end')
+addpath('../massivemimobook-master/Code','-end')
+addpath('../802_16_outdoor/genChannels')
 output_folder = 'exp1/'; %end with /
 
 run_time_evolution_analysis = 0; %plot and pause
@@ -104,10 +106,10 @@ Ne = num_blocks * tau_c; %num of samples in episode
 num_total_samples = num_blocks * (tau_c - tau_p + 1); %old?
 %num_total_samples=100; %number of channel realizations
 
-mkdir(output_folder)
-mkdir([output_folder 'channels/'])
-%addpath('.\yuichi_channel_time_evolution\','-end');
-addpath(fullfile(pwd, '/channel_generator/yuichi_channel_time_evolution'),'-end')
+[status, msg, msgID] = mkdir(output_folder);
+[status, msg, msgID] = mkdir([output_folder 'channels/']);
+addpath('./yuichi_channel_time_evolution','-end');
+%addpath(fullfile(pwd, '/channel_generator/yuichi_channel_time_evolution'),'-end')
 %addpath('yuichi_channel_time_evolution','-end');
 %% Propagation parameters
 BW=100e6; %100 MHz - Communication bandwidth
