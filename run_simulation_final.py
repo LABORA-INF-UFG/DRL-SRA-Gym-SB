@@ -17,7 +17,7 @@ import copy
 
 ## env dealling with combinatorial action space
 ## computing percentual of the packet loss per allocation
-from sra_env.sra_env3 import SRAEnv
+from sra_env.sra_env4 import SRAEnv
 
 
 class NumpyArrayEncoder(JSONEncoder):
@@ -39,13 +39,13 @@ simulation_type = "n-stationary"
 #F = "_F_3-3_ME_TI_mixed" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic int
 #F = "_F_2-2_ME"
 #F = "_F_1-1_ME_TI_low1"
-F = "_F_" + consts.F_D + "_low_v4"
+F = "_F_" + consts.F_D + "_low"
 
 # number of executions/episodes per trained models
 t = 50
 
 tqdm_ = "10-30000"
-rr = list(range(1000,24010,1000))
+rr = list(range(1000,18010,1000))
 #rr = list(range(10000,50001,10000))
 rr.append(10)
 #rr.append(101000)
@@ -113,7 +113,7 @@ tss = []
 #folder = consts.MODELS_FOLDER_STATIONARY
 #folder = consts.MODELS_FOLDER
 #folder = consts.MODELS_FINAL
-folder = 'trained_models_3/'
+folder = 'trained_models_3/v020/'
 
 for i in tqdm_e:
     ts = i
@@ -176,7 +176,9 @@ for i in tqdm_e:
                 # for model1
                 rw_drl_a_1.append(rewards_1[0])
                 # index 2 is the drl agent pkt loss
-                pkt_l_drl_a_1.append(rewards_1[2][0])
+                # -10 is a fake packet loss. The real value only comes at the episode end.
+                if rewards_1[2][0] > -10.:
+                    pkt_l_drl_a_1.append(rewards_1[2][0])
                 pkt_d_drl_a_1.append(np.mean(rewards_1[3][0]))
             if obs2 is not None:
                 while True:
@@ -188,7 +190,9 @@ for i in tqdm_e:
                         # for model2
                 rw_drl_a_2.append(rewards_2[0])
                 # the last one is the drl agent pkt loss
-                pkt_l_drl_a_2.append(rewards_2[2][0])
+                # -10 is a fake packet loss. The real value only comes at the episode end.
+                if rewards_2[2][0] > -10.:
+                    pkt_l_drl_a_2.append(rewards_2[2][0])
                 pkt_d_drl_a_2.append(np.mean(rewards_2[3][0]))
             if obs3 is not None:
                 while True:
@@ -200,7 +204,9 @@ for i in tqdm_e:
                 # for model3
                 rw_drl_a_3.append(rewards_3[0])
                 # the last one is the drl agent pkt loss
-                pkt_l_drl_a_3.append(rewards_3[2][0])
+                # -10 is a fake packet loss. The real value only comes at the episode end.
+                if rewards_3[2][0] > -10.:
+                    pkt_l_drl_a_3.append(rewards_3[2][0])
                 pkt_d_drl_a_3.append(np.mean(rewards_3[3][0]))
             if obs4 is not None:
                 while True:
@@ -212,7 +218,9 @@ for i in tqdm_e:
                 # for model4
                 rw_drl_a_4.append(rewards_4[0])
                 # the last one is the drl agent pkt loss
-                pkt_l_drl_a_4.append(rewards_4[2][0])
+                # -10 is a fake packet loss. The real value only comes at the episode end.
+                if rewards_4[2][0] > -10.:
+                    pkt_l_drl_a_4.append(rewards_4[2][0])
                 pkt_d_drl_a_4.append(np.mean(rewards_4[3][0]))
             if obs5 is not None:
                 while True:
@@ -224,7 +232,9 @@ for i in tqdm_e:
                 # for model5
                 rw_drl_a_5.append(rewards_5[0])
                 # the last one is the drl agent pkt loss
-                pkt_l_drl_a_5.append(rewards_5[2][0])
+                # -10 is a fake packet loss. The real value only comes at the episode end.
+                if rewards_5[2][0] > -10.:
+                    pkt_l_drl_a_5.append(rewards_5[2][0])
                 pkt_d_drl_a_5.append(np.mean(rewards_5[3][0]))
             if obs6 is not None:
                 while True:
@@ -236,7 +246,9 @@ for i in tqdm_e:
                 # for model6
                 rw_drl_a_6.append(rewards_6[0])
                 # the last one is the drl agent pkt loss
-                pkt_l_drl_a_6.append(rewards_6[2][0])
+                # -10 is a fake packet loss. The real value only comes at the episode end.
+                if rewards_6[2][0] > -10.:
+                    pkt_l_drl_a_6.append(rewards_6[2][0])
                 pkt_d_drl_a_6.append(np.mean(rewards_6[3][0]))
             if obs7 is not None:
                 while True:
@@ -248,13 +260,17 @@ for i in tqdm_e:
                 # for model7
                 rw_drl_a_7.append(rewards_7[0])
                 # the last one is the drl agent pkt loss
-                pkt_l_drl_a_7.append(rewards_7[2][0])
+                # -10 is a fake packet loss. The real value only comes at the episode end.
+                if rewards_7[2][0] > -10.:
+                    pkt_l_drl_a_7.append(rewards_7[2][0])
                 pkt_d_drl_a_7.append(np.mean(rewards_7[3][0]))
 
             ## running for each scheduler
             for u,v in enumerate(env1.schedulers):
                 rw_sh[u].append(rewards_1[1][u])
-                pkt_l_sh[u].append(rewards_1[2][u+1])
+                # -10 is a fake packet loss. The real value only comes at the episode end.
+                if rewards_1[2][u + 1] > -10.:
+                    pkt_l_sh[u].append(rewards_1[2][u+1])
                 pkt_d_sh[u].append(np.mean(rewards_1[3][u + 1]))
 
         # appending the episode allocations results #################

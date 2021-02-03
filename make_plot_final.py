@@ -51,7 +51,7 @@ pkt_d_sch = [[] for i in range(n_sch)]
 #n-stationary_F_2-2_ME_history_full_10-100000_2_rounds_100_bloks_eps_lr_007
 #n-stationary_F_2-2_ME_history_full_10-100000_2_rounds_100_bloks_eps_lr_007.json
 #f = 'history_final/' + simulation_type + F + "_history_full_10-101000_" + str(t) + '_rounds_' + str(consts.BLOCKS_EP) + '_bloks_eps_lr_' + consts.LR_D + '.json'
-f = 'history_final/' + simulation_type + F + "_history_full_10-100000_" + str(t) + '_rounds_' + str(consts.BLOCKS_EP) + '_bloks_eps_lr_' + consts.LR_D + '.json'
+f = 'history_final/' + simulation_type + F + "_history_full_10-30000_" + str(t) + '_rounds_' + str(consts.BLOCKS_EP) + '_bloks_eps_lr_' + consts.LR_D + '.json'
 tqdm_ = "10-30000"
 
 history = SaveResults.load_history(f)

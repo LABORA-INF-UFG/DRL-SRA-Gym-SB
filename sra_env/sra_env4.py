@@ -8,7 +8,7 @@ import copy
 
 import consts
 from akpy.MassiveMIMOSystem5 import MassiveMIMOSystem
-from akpy.buffers_at_BS2 import Buffers
+from akpy.buffers_at_BS import Buffers
 from schedulers.max_th import MaxTh
 from schedulers.proportional_fair import ProportionalFair
 from schedulers.round_robin import RoundRobin
@@ -86,8 +86,8 @@ class SRAEnv(gym.Env):
         # creating the Round Robin scheduler instance with independent buffers
         self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
         # another scheduler instance, for testing with multiple schedulers
-        #self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
-        #self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
 
         obs = self.reset()
         self.observation_space = spaces.Box(low=0,high=1,shape=obs.shape,dtype=np.float32)

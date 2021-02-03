@@ -41,8 +41,8 @@ class Buffers:
         self.dropped_last_iteration = np.zeros((self.num_buffers,),np.uint64) #instantaneous drops
 
         # for buffer history
-        self.buffer_history_incoming = [[0.] for i in range(self.num_buffers)]
-        self.buffer_history_dropped = [[0.] for i in range(self.num_buffers)]
+        self.buffer_history_incoming = [0. for i in range(self.num_buffers)]
+        self.buffer_history_dropped = [0. for i in range(self.num_buffers)]
 
     def create_buffers_same_size(self, buffer_size):
         self.create_buffers(buffer_size * np.ones((self.num_buffers,),np.uint64))
