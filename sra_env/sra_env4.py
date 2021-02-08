@@ -75,6 +75,11 @@ class SRAEnv(gym.Env):
         self.buffers = Buffers(num_buffers=self.K, buffer_size=self.buffer_size, max_packet_age=self.max_packet_age)
         self.buffers.reset_buffers()  # Initializing buffers
 
+        # individual rates history
+        self.rates_history = []
+        # initialization to avoid error in the first run
+        self.rates_history.append([self.buffer_size for i in range(self.K)])
+
         # Massive MIMO System
         self.mimo_systems = self.makeMIMO(self.F, self.K)
         self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F, tp=0)
@@ -84,9 +89,9 @@ class SRAEnv(gym.Env):
 
         self.schedulers = []
         # creating the Round Robin scheduler instance with independent buffers
-        self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
         # another scheduler instance, for testing with multiple schedulers
-        self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
         self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
 
         obs = self.reset()
@@ -164,6 +169,8 @@ class SRAEnv(gym.Env):
                                             self.curr_slot, self.packet_size_bits)
             rates.append(r[i])
         self.rates = rates
+        # history
+        self.rates_history.append(rates)
 
         ## allocation
         action = self.actions[action_index]
@@ -196,7 +203,8 @@ class SRAEnv(gym.Env):
                 for sc in self.schedulers:
                     if sc.name == 'Proportional Fair' or sc.name == 'Max th':
                         curr_f = 0
-                        sc.exp_thr = rates
+                        # sc.exp_thr = self.rates
+                        sc.exp_thr = self.rates_history[-2]
                         ues = sc.policy_action()
                         for u in ues:
                             sc.alloc_users[curr_f].append(u)
@@ -229,7 +237,7 @@ class SRAEnv(gym.Env):
             self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
                                                           self.recent_spectral_eff, self.curr_slot)
 
-            reward, dropped_pkt, dropped_pkts_percent_mean = self.rewardCalc(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_slot,
+            reward, dropped_pkt, dropped_pkts_percent_mean = self.rewardCalc_(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_slot,
                                                    self.packet_size_bits, [self.rates_pkt_per_s, rates], self.buffers,
                                                    self.min_reward, self.recent_spectral_eff, update=True)
 
@@ -277,6 +285,19 @@ class SRAEnv(gym.Env):
 
     def rewardCalc(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int, packet_size_bits: int,
                    pkt_rate, buffers: Buffers, min_reward: int, SE: list, update) -> float:  # Calculating reward value
+
+        buffer_states = buffers.get_buffer_states()
+
+        # Buffer occupancy
+        buffer_occupancies = buffer_states[0] / self.buffer_size
+
+        # Oldest packets
+        oldest_packet_per_buffer = buffer_states[1]
+        # All values above threshold are set to the maximum value allowed
+        oldest_packet_per_buffer[oldest_packet_per_buffer > self.max_packet_age] = self.max_packet_age
+        # Normalization
+        #oldest_packet_per_buffer = oldest_packet_per_buffer / self.max_packet_age
+
         if not update:
             (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlowNoUpdate(pkt_rate[0],
                                                                                                              buffers,
@@ -287,7 +308,11 @@ class SRAEnv(gym.Env):
             (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean) = self.pktFlow(pkt_rate[0],
                                                                                                      buffers,
                                                                                                      mimo_systems)
-            reward = 10 * (tx_pkts / 50000)
+            reward = 10 * (tx_pkts / 50000) - 100 * (dropped_pkts_sum / (tx_pkts + 1))
+            if np.sum(oldest_packet_per_buffer) == 10:
+                reward += 10 * np.sum(oldest_packet_per_buffer)
+            else:
+                reward -= 10 * np.sum(oldest_packet_per_buffer)
 
         if reward < 0:
             reward = self.min_reward if reward < self.min_reward else reward  # Impose a minimum vale for reward
@@ -297,21 +322,23 @@ class SRAEnv(gym.Env):
     def rewardCalc_(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int, packet_size_bits: int,
                    pkt_rate, buffers: Buffers, min_reward: int, SE: list, update) -> float:  # Calculating reward value
         if not update:
-            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlowNoUpdate(pkt_rate[0],
-                                                                                                             buffers,
-                                                                                                             mimo_systems)
+            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlowNoUpdate(
+                pkt_rate[0],
+                buffers,
+                mimo_systems)
 
             reward = 10 * (tx_pkts / 50000) - 100 * (dropped_pkts_sum / (tx_pkts + 1))
         else:
-            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlow(pkt_rate[0],
-                                                                                                     buffers,
-                                                                                                     mimo_systems)
+            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers,
+             dropped_pkts_percent_mean) = self.pktFlow(pkt_rate[0],
+                                                       buffers,
+                                                       mimo_systems)
             reward = 10 * (tx_pkts / 50000)
 
         if reward < 0:
             reward = self.min_reward if reward < self.min_reward else reward  # Impose a minimum vale for reward
 
-        return reward, dropped_pkts_sum
+        return reward, dropped_pkts_sum, dropped_pkts_percent_mean
 
     def rateEstimationUsersAll(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int,
                                packet_size_bits: int) -> list:  # Calculates the rate per second for each user considering if it was selected to transmit in any frequency and
@@ -380,6 +407,7 @@ class SRAEnv(gym.Env):
         # using matrix state - models - run_simulation2.py
         #return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
         #using vector state - models2 - run_simulation3.py
+        #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))
         return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
 
     # calculation of packets transmission and reception (from transmit_and_receive_new_packets function)
