@@ -49,6 +49,7 @@ class Buffers:
 
     def reset_buffers(self):
         self.create_buffers(self.buffer_sizes)
+        self.time_counter = 0  # count discrete-time
 
     def packets_departure(self, num_candidate_packets_to_be_discarded):
         '''
