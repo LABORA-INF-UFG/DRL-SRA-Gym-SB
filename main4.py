@@ -4,13 +4,14 @@ from stable_baselines.common.env_checker import check_env
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.deepq.policies import MlpPolicy as mlpp
 from stable_baselines import A2C, ACKTR, TRPO, ACER, DQN, PPO1, PPO2
-from sra_env.sra_env2 import SRAEnv
+from sra_env.sra_env4 import SRAEnv
 from tqdm import tqdm
 import consts
 import sys
 import os
 
 '''
+remember to change to env4!!!!!!!!!!!!!!!!
 run "traditional" training. Main4 > run_simulation_final > make_plot_final
 '''
 
@@ -38,20 +39,20 @@ if 'PPO2' in sys.argv:
 #folder = consts.MODELS_FOLDER_STATIONARY
 #folder = consts.MODELS_FOLDER
 
-rr = list(range(1000,100001,1000))
-rr.append(10)
-rr.sort()
+rr = list(range(100000,300001,100000))
+#rr.append(10)
+#rr.sort()
 tqdm_e = tqdm(rr, desc='Time Steps', leave=True, unit=" time steps")
 
 #folder = consts.MODELS_FINAL
-folder = 'trained_models/'
+folder = 'trained_models_mixed/'
 if not os.path.exists(folder):
     os.makedirs(folder)
 #F = "_F_3-3_ME_TI_2" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic int
 # low using load factor = 2
 # low 2 using load factor = 8
 #F = "_F_1-1_ME_TI_low1" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic interference
-F = "_F_" + consts.F_D + "_high"
+F = "_F_" + consts.F_D + "_mixed_ti_10" # ti_10 = traffic interference 10, with variated network load
 
 for i in tqdm_e:
     #i = 1 if i == 0 else i
