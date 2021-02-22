@@ -4,7 +4,7 @@ from stable_baselines.common.env_checker import check_env
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.deepq.policies import MlpPolicy as mlpp
 from stable_baselines import A2C, ACKTR, TRPO, ACER, DQN, PPO1, PPO2
-from sra_env.sra_env4 import SRAEnv
+from sra_env.sra_env6 import SRAEnv
 from tqdm import tqdm
 import consts
 import sys
@@ -45,7 +45,7 @@ rr = list(range(100000,300001,100000))
 tqdm_e = tqdm(rr, desc='Time Steps', leave=True, unit=" time steps")
 
 #folder = consts.MODELS_FINAL
-folder = 'trained_models_mixed/'
+folder = 'trained_models_4/'
 if not os.path.exists(folder):
     os.makedirs(folder)
 #F = "_F_3-3_ME_TI_2" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic int
