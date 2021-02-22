@@ -92,8 +92,8 @@ class SRAEnv(gym.Env):
         # creating the Round Robin scheduler instance with independent buffers
         #self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
         # another scheduler instance, for testing with multiple schedulers
-        #self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
-        self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
 
         obs = self.reset()
         self.observation_space = spaces.Box(low=0,high=1,shape=obs.shape,dtype=np.float32)
@@ -401,21 +401,9 @@ class SRAEnv(gym.Env):
         thr = np.minimum(self.rates, self.buffers.buffer_occupancies)
         max_rate = np.max(thr)
         p_rates = thr / self.buffer_size
-        #return np.hstack((buffer_occupancies, spectral_eff.flatten(), p_rates.flatten(), oldest_packet_per_buffer))
-        #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
-        # using matrix state - models - run_simulation2.py
-        #return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
-        #using vector state - models2 - run_simulation3.py
 
-            #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))
-        if "delay" in self.desc:
-            self.observation_space = np.hstack((oldest_packet_per_buffer))
-        elif "rates" in self.desc:
-            self.observation_space = np.hstack((p_rates.flatten()))
-        elif "occupancy" in self.desc:
-            self.observation_space = np.hstack((buffer_occupancies, p_rates.flatten()))
-        else:
-            self.observation_space = np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))
+        # new models, considering the delay
+        self.observation_space = np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))
 
         return self.observation_space
 

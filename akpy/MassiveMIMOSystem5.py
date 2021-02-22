@@ -73,8 +73,8 @@ class MassiveMIMOSystem:
         #depends on dataset
         #self.num_episodes = 200 ## 200 for new data
         self.num_episodes = 200
-        self.range_episodes_train = [0,99]
-        self.range_episodes_validate = [100,199]
+        self.range_episodes_train = [0,49]
+        self.range_episodes_validate = [0,49]
         self.num_blocks_per_episode = 100 ## 100 for new data
         #self.num_blocks_per_episode = 20
         self.current_sample_index = 0
@@ -691,7 +691,8 @@ class MassiveMIMOSystem:
         #associated to another class, not here
 
         #assume a folder structure such that:
-        file_name = self.root_folder + '/traffic_interference_9/traffic_interference_e_' + str(episode_number+1) + '.mat'
+        #file_name = self.root_folder + '/traffic_interference_validation/v10/traffic_interference_e_' + str(episode_number+1) + '.mat'
+        file_name = self.root_folder + '/traffic_interference_9/traffic_interference_e_' + str(episode_number + 1) + '.mat'
         arrayNames = ('num_pckts','interference')
         my_list = read_several_matlab_arrays_from_mat(file_name, arrayNames)
         self.num_pckts = my_list[0]
