@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.stats
+from json import JSONEncoder
 
 class Tools():
 
@@ -22,3 +23,9 @@ class Tools():
         for v in data:
             new_data.append(np.hstack(v))
         return new_data
+
+class NumpyArrayEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return JSONEncoder.default(self, obj)
