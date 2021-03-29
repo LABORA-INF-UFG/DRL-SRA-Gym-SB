@@ -17,7 +17,7 @@ import copy
 
 ## env dealling with combinatorial action space
 ## computing percentual of the packet loss per allocation
-from sra_env.sra_env4 import SRAEnv
+from sra_env.sra_env6 import SRAEnv
 
 
 class NumpyArrayEncoder(JSONEncoder):
@@ -26,9 +26,9 @@ class NumpyArrayEncoder(JSONEncoder):
             return obj.tolist()
         return JSONEncoder.default(self, obj)
 
-env1 = SRAEnv()
-env1.running_tp = 1 # validation with different dataset
-env1.type = "Master"
+env1 = SRAEnv(type="Master", running_tp=1, desc="A2C")
+#env1.running_tp = 1 # validation with different dataset
+#env1.type = "Master"
 
 #simulation_type = "stationary"
 simulation_type = "n-stationary"
@@ -39,16 +39,19 @@ simulation_type = "n-stationary"
 #F = "_F_3-3_ME_TI_mixed" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic int
 #F = "_F_2-2_ME"
 #F = "_F_1-1_ME_TI_low1"
-F = "_F_" + consts.F_D + "_low"
+F = "_F_" + consts.F_D + "_all_mixed_ti11"
 
 # number of executions/episodes per trained models
 t = 50
 
 tqdm_ = "10-30000"
-rr = list(range(1000,18010,1000))
+rr = list(range(1000,30010,1000))
 #rr = list(range(10000,50001,10000))
 rr.append(10)
-#rr.append(101000)
+#rr.append(30000)
+#rr.append(40000)
+#rr.append(50000)
+#rr.append(60000)
 rr.sort()
 tqdm_e = tqdm(rr, desc='Time Steps', leave=True, unit=" time steps")
 
@@ -113,7 +116,9 @@ tss = []
 #folder = consts.MODELS_FOLDER_STATIONARY
 #folder = consts.MODELS_FOLDER
 #folder = consts.MODELS_FINAL
-folder = 'trained_models_3/v020/'
+folder = 'trained_models_4/v3/'
+
+
 
 for i in tqdm_e:
     ts = i
