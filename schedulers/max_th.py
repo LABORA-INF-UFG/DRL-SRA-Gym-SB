@@ -17,11 +17,10 @@ class MaxTh(Scheduler):
 
     def policy_action(self) -> int:
         # choose between the throughput available to send or the buffer size to send values
-        thr = np.minimum(self.exp_thr, self.buffers.buffer_occupancies)# choose between the throughput available to send or the buffer size to send values
+        buffer_occ = self.buffers.buffer_occupancies * 1.0
+        #using QCI information
+        thr = np.minimum(self.exp_thr, buffer_occ)# choose between the throughput available to send or the buffer size to send values
 
-        #return (
-        #        np.argsort(-1 * thr)[: (np.sum(self.F))] + 1
-        #)  # Sort UEs throughput in th descending order
         return (np.argsort(-1 * thr)[: np.sum(self.F)])
 
     def reset(self):
