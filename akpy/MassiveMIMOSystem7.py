@@ -73,15 +73,16 @@ from akpy.util import compare_tensors
 from pathlib import Path
 
 class MassiveMIMOSystem:
-    def __init__(self, K=3, frequency_index=1):
+    def __init__(self, K=3, frequency_index=1, tf_folder=None):
         self.frequency_index = frequency_index
+        self.tf_folder = tf_folder
         #depends on dataset
         #self.num_episodes = 200 ## 200 for new data
         self.frequency = [2,28] #GHz fc
-        self.num_episodes =20
-        self.range_episodes_train = [10,19]
-        self.range_episodes_validate = [10,19]
-        self.num_blocks_per_episode = 100 ## 100 for new data
+        self.num_episodes =50
+        self.range_episodes_train = [0,24]
+        self.range_episodes_validate = [25,49]
+        self.num_blocks_per_episode = 1000 ## 100 for new data
         #self.num_blocks_per_episode = 20
         self.current_sample_index = 0
         #Select length of coherence block
@@ -97,7 +98,7 @@ class MassiveMIMOSystem:
         #precoding and combining methods: MMSE, MR or RZF
         self.precoding_method = 'MR'
         self.root_folder = 'E:/Docs_Doutorado/exp1_f2_mmw'
-        self.root_folder_channel = 'E:/Docs_Doutorado/nw_dataset_ryan'
+        self.root_folder_channel = 'E:/Docs_Doutorado/dataset_ryan2'
         #self.file_name_prefix = self.root_folder + '/channels/' + 'channels_f' + str(frequency_index) + '_b' + str(self.num_blocks_per_episode) + 'tauc' + str(self.tau_c) + 'taup' + str(self.tau_p) + 'e_'
         self.file_name_prefix = self.root_folder_channel + '/H_'
 
@@ -126,7 +127,7 @@ class MassiveMIMOSystem:
         #self.nbrOfRealizations = 10
         ## Propagation parameters
         #Communication bandwidth
-        self.BW = 100e6 #in Hz
+        self.BW = [20e6, 100e6] #in Hz
         #self.BW = 20e6  # in Hz
         #from functionChannelEstimates.m
 
@@ -137,8 +138,9 @@ class MassiveMIMOSystem:
         rho = 100
 
         #load the gamma parameters
-        gamma_file_name = self.root_folder + '/gamma_parameters'+str(frequency_index) + '.mat' #e.g. gamma_parameters1.mat
-        self.gamma_parameters = read_matlab_array_from_mat(gamma_file_name, 'gamma_parameters')
+        #gamma_file_name = self.root_folder + '/gamma_parameters'+str(frequency_index) + '.mat' #e.g. gamma_parameters1.mat
+        #self.gamma_parameters = read_matlab_array_from_mat(gamma_file_name, 'gamma_parameters')
+        self.gamma_parameters = []
         self.current_intercell_interference = np.zeros((self.num_UEs_per_BS,))
         #if we serve less users than K, interference should decrease:
         self.intercell_interference_scaling_factor = 1 #self.Kmax / self.num_UEs_per_BS
@@ -195,12 +197,23 @@ class MassiveMIMOSystem:
         return self.current_intercell_interference
 
     def update_intercell_interference(self):
-        for u in range(self.num_UEs_per_BS):
-            shape = self.gamma_parameters[u,0]
-            scale = self.gamma_parameters[u,1]
-            #s = np.random.gamma(shape, scale, 10000)
-            self.current_intercell_interference[u] = self.intercell_interference_scaling_factor * np.random.gamma(shape, scale, 1)
-
+        '''
+        Load interference from selected trial/episode
+        and update the current intercell interference
+        '''
+        # inter_file = "E:/Docs_Doutorado/dataset_ryan/SE_trial_1.pkl"
+        # #                  + "_f_"+str(self.frequency[self.frequency_index])+".mat"
+        # with open(inter_file, 'rb') as pickle_in:
+        #     loaded_I = pickle.load(pickle_in)
+        #
+        # for u in range(self.num_UEs_per_BS):
+        #     #shape = self.gamma_parameters[u,0]
+        #     #scale = self.gamma_parameters[u,1]
+        #     #s = np.random.gamma(shape, scale, 10000)
+        #     #self.current_intercell_interference[u] = self.intercell_interference_scaling_factor * np.random.gamma(shape, scale, 1)
+        #     self.current_intercell_interference[u] = loaded_I[self.current_sample_index][u]
+        #
+        pass
     '''
     from functionComputeSINR_DL.m
     Implements only the MMSE precoding (from MMSE combining and duality)
@@ -690,14 +703,15 @@ class MassiveMIMOSystem:
     def load_episode(self, episode_number):
         if episode_number > self.num_episodes-1:
             raise Exception("episode_number > self.num_episodes-1:" + str(episode_number))
-        self.episode_number = episode_number
+        self.episode_number = episode_number + 1
         #file_name = str(self.file_name_prefix) + (str(episode_number+1) + '.pkl')
         #with open(file_name, 'rb') as pickle_in:
         #    unpickled = pickle.load(pickle_in)
         #self.H = np.array(unpickled[self.frequency_index-1])
         #self.H = self.H.getH()
         ## loading with Cleverson' code
-        file_name = 'E:/Docs_Doutorado/dataset_ryan/trial_1_f_' + str(self.frequency[self.frequency_index-1]) + 'b.mat'
+        file_name = 'E:/Docs_Doutorado/dataset_ryan2/channel_trial_'+str(self.episode_number)+'_f_' + str(self.frequency[self.frequency_index-1]) + '_1k.mat'
+        #file_name = 'E:/Docs_Doutorado/dataset_ryan/channel_trial_2_f_2b.mat'
         arrayNames = ('H')
         #my_list = read_several_matlab_arrays_from_mat(file_name, arrayNames)
         #data_dict = mat73.loadmat(file_name)
@@ -715,7 +729,14 @@ class MassiveMIMOSystem:
 
         #assume a folder structure such that:
         #file_name = self.root_folder + '/traffic_interference_validation/v10/traffic_interference_e_' + str(episode_number+1) + '.mat'
-        file_name = self.root_folder + '/traffic_interference_9/traffic_interference_e_' + str(episode_number + 1) + '.mat'
+        file_name = self.root_folder + '/traffic_interference_11/traffic_interference_e_' + str(episode_number + 1) + '.mat'
+        #file_name = self.root_folder + '/traffic_interference_9/traffic_interference_e_' + str(episode_number + 1) + '.mat'
+        #file_name = self.root_folder + '/traffic_interference_validation/v20/traffic_interference_e_' + str(episode_number + 1) + '.mat'
+        #file_name = self.root_folder + '/traffic_interference_validation/mixed/traffic_interference_e_' + str(episode_number + 1) + '.mat'
+        #file_name = self.root_folder + '/traffic_interference_nds/traffic_interference_e_' + str(episode_number + 1) + '.mat'
+        #file_name = self.root_folder + '/traffic_interference_nds_25/traffic_interference_e_' + str(
+        #    episode_number + 1) + '.mat'
+        file_name = self.root_folder + self.tf_folder + 'traffic_interference_e_' + str(episode_number+1) + '.mat'
         arrayNames = ('num_pckts','interference')
         my_list = read_several_matlab_arrays_from_mat(file_name, arrayNames)
         self.num_pckts = my_list[0]
@@ -723,6 +744,21 @@ class MassiveMIMOSystem:
 
         #make sure we reset index
         self.current_sample_index = 0
+
+    def SE_current_sample(self, current_sample_index, selected_users):
+        inter_file = "E:/Docs_Doutorado/dataset_ryan2/SE_trial"+str(self.episode_number)+".pkl"
+
+        with open(inter_file, 'rb') as pickle_in:
+            loaded_I = pickle.load(pickle_in)
+        SE = []
+        for u in selected_users:
+            SE.append(loaded_I[self.frequency_index-1,u,current_sample_index])
+
+        #thisSE = np.zeros((self.num_connected_users_in_target_BS,))
+        #thisSE[selected_users] = SE
+        #return thisSE
+        #print(SE)
+        return SE
 
     def SE_for_given_sample(self, current_sample_index, selected_users, Kmax, avoid_estimation_errors = False):
         # initialize
