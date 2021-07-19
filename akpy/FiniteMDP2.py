@@ -15,7 +15,7 @@ from builtins import print
 from random import choices
 import random
 from akpy.EnvironmentByNextStateProbs import EnvironmentByNextStateProbs
-from akpy.EnvironmentMassiveMIMO import EnvironmentMassiveMIMO
+#from akpy.EnvironmentMassiveMIMO import EnvironmentMassiveMIMO
 
 class FiniteMDP:
     def __init__(self, environment, S, A, discount=0.9):
@@ -86,7 +86,7 @@ class FiniteMDP:
         (S, A, nS) = self.environment.nextStateProbability.shape
         # A = len(actionListGivenIndex)
         new_state_values = np.zeros((S,))
-        state_values = new_state_values.copy()
+        state_values = new_state_values.deepcopy()
         iteration = 1
         while True:
             src = new_state_values if in_place else state_values
@@ -110,10 +110,10 @@ class FiniteMDP:
                 print('new state values=', new_state_values)
                 print('it=', iteration, 'improvement = ', improvement)
             if improvement < 1e-4:
-                state_values = new_state_values.copy()
+                state_values = new_state_values.deepcopy()
                 break
 
-            state_values = new_state_values.copy()
+            state_values = new_state_values.deepcopy()
             iteration += 1
 
         return state_values, iteration
@@ -123,7 +123,7 @@ class FiniteMDP:
         (S, A, nS) = self.environment.nextStateProbability.shape
         # A = len(actionListGivenIndex)
         new_state_values = np.zeros((S,))
-        state_values = new_state_values.copy()
+        state_values = np.zeros((S,)) #new_state_values.copy()
         iteration = 1
         while True:
             for s in range(S):
@@ -143,7 +143,7 @@ class FiniteMDP:
                 print('new state values=', new_state_values)
                 print('it=', iteration, 'improvement = ', improvement)
 
-            state_values = new_state_values.copy()
+            state_values = new_state_values.deepcopy()
             if improvement < 1e-4:
                 break
 
@@ -156,7 +156,7 @@ class FiniteMDP:
         (S, A, nS) = self.environment.nextStateProbability.shape
         # A = len(actionListGivenIndex)
         new_action_values = np.zeros((S, A))
-        action_values = new_action_values.copy()
+        action_values = np.zeros((S, A)) #new_action_values.copy()
         iteration = 1
         while True:
             # src = new_action_values if in_place else action_values
@@ -170,14 +170,16 @@ class FiniteMDP:
                         best_a = -np.Infinity
                         for nexta in range(A):
                             temp = action_values[nexts, nexta]
+                            #print(temp)
                             if temp > best_a:
                                 best_a = temp
+                        #print(p, r, self.discountGamma, best_a)
                         value += p * (r + self.discountGamma * best_a)
                         # value += p*(r+discount*src[nexts])
                         # print('aa', value)
                     new_action_values[s, a] = value
             improvement = np.sum(np.abs(new_action_values - action_values))
-            # print('improvement =', improvement)
+            #print('improvement =', improvement)
             if False:  # debug
                 print('state values=', action_values)
                 print('new state values=', new_action_values)
@@ -304,14 +306,28 @@ def test_with_EnvironmentByNextStateProbs():
     S = 3
     A = 2
     nextStateProbability = np.random.rand(S,A,S) #positive numbers
+    print(nextStateProbability)
+    #normalize the probability mass functions (pmf's) to sum up to 1
+    for s in range(S):
+        for a in range(A):
+            p=0 #reset
+            for nexts in range(S):
+                p += nextStateProbability[s,a,nexts] #sum
+            if p != 0:
+                nextStateProbability[s,a] /= p #normalize
+    print(nextStateProbability)
     rewardsTable = np.random.randn(S,A,S) #can be negative
     environment = EnvironmentByNextStateProbs(nextStateProbability, rewardsTable)
     mdp = FiniteMDP(environment, S, A, discount=0.9)
-    stateActionValues, rewardsQLearning = mdp.execute_q_learning(maxNumIterationsQLearning=100)
+    maxNumIterationsQLearning = 1000
+    stateActionValues, rewardsQLearning = mdp.execute_q_learning(maxNumIterationsQLearning=maxNumIterationsQLearning)
+    print("From Q-learning")
     print(stateActionValues)
-    print(rewardsQLearning)
+    #print(rewardsQLearning)
+    print("Optimum (from probabilities)")
+    print(mdp.compute_optimal_action_values())
 
-if __name__ == '__main__':
+def test_with_EnvironmentMassiveMIMO():
     environment = EnvironmentMassiveMIMO()
     S = environment.get_num_states()
     A = environment.get_num_actions()
@@ -319,3 +335,6 @@ if __name__ == '__main__':
     stateActionValues, rewardsQLearning = mdp.execute_q_learning(maxNumIterationsQLearning=100)
     print(stateActionValues)
     print(rewardsQLearning)
+
+if __name__ == '__main__':
+    test_with_EnvironmentByNextStateProbs()

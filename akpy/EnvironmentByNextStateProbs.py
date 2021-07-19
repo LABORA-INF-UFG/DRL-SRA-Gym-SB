@@ -3,19 +3,24 @@ from random import choices, randint
 
 class EnvironmentByNextStateProbs:
     def __init__(self, nextStateProbability, rewardsTable):
+
         self.__version__ = "0.1.0"
         # print("AK Finite MDP - Version {}".format(self.__version__))
 
         self.nextStateProbability = nextStateProbability
         self.rewardsTable = rewardsTable
 
-        self.currentObservation = 0
-
         #(S, A, nS) = self.nextStateProbability.shape #should not require nextStateProbability, which is often unknown
         self.S = nextStateProbability.shape[0]  # number of states
         self.A = nextStateProbability.shape[1]  # number of actions
 
         self.currentIteration = 0
+
+        #AK do we need? - TODO review
+        self.current_reward=-1
+        self.currentObservation = 0 #self.current_state=-1
+        self.next_state=0
+
         self.reset()
 
     def step(self, action):
@@ -36,15 +41,12 @@ class EnvironmentByNextStateProbs:
 
         elements = np.arange(self.S)
         # weights = np.squeeze(self.nextStateProbability[s,action])
-        weights = self.nextStateProbability[s, action]
-        nexts = choices(elements, weights, k=1)[0]
+        pmf = self.nextStateProbability[s, action]
+        self.next_state = choices(elements, pmf, k=1)[0]
 
         # p = self.nextStateProbability[s,action]
         # reward = self.rewardsTable[s,action, nexts][0]
-        reward = self.rewardsTable[s, action, nexts]
-
-        # fully observable MDP: observation is the actual state
-        self.currentObservation = nexts
+        self.reward = self.rewardsTable[s, action, self.next_state]
 
         gameOver = False
         if self.currentIteration > np.Inf:
@@ -54,12 +56,16 @@ class EnvironmentByNextStateProbs:
             ob = self.get_state()
 
         history = {"time": self.currentIteration, "state_t": s, "action_t": action,
-                   "reward_tp1": reward, "state_tp1": nexts}
+                   "reward_tp1": self.reward, "state_tp1": self.next_state}
         # history version with actions and states, not their indices
         # history = {"time": self.currentIteration, "action_t": self.actionListGivenIndex[action],
         #           "reward_tp1": reward, "observation_tp1": self.stateListGivenIndex[self.get_state()]}
+
+        #prepare for next iteration
+        # fully observable MDP: observation is the actual state
+        self.currentObservation = self.next_state
         self.currentIteration += 1
-        return ob, reward, gameOver, history
+        return ob, self.reward, gameOver, history
 
     def get_state(self):
         """Get the current observation."""
@@ -81,6 +87,9 @@ class EnvironmentByNextStateProbs:
     # def seed(self, seed=None):
     #    self.np_random, seed = seeding.np_random(seed)
     #    return [seed]
+
+    def get_current_reward(self):
+        return self.reward 
 
     def numberOfActions(self):
         return self.A
