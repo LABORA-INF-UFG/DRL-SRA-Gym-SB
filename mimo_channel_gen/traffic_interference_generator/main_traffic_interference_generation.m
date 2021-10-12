@@ -34,14 +34,16 @@ method = 3; %1 is flat rate, 2 is to increase rate and then decrease
             %3 is "residential and business"
 fixed_rate = 12000; %if method==1
 
-load([main_folder 'all_locations.mat']) %load pre-computed BSpositions and UEpositions
-
-[K, L]=size(UEpositions);
-
 if 0
-    SEs_all_users = ones(K,1); %assume SE=1 to all users
+  %we have the .mat previously generated
+  load([main_folder 'all_locations.mat']) %load pre-computed BSpositions and UEpositions
+  [K, L]=size(UEpositions);
+  eval(['load ' main_folder 'SEs_all_users1.mat']) %assume first frequency
 else
-    eval(['load ' main_folder 'SEs_all_users1.mat']) %assume first frequency
+  %we will assume some arbitrary values
+  K=5;
+  L=3;
+  SEs_all_users = ones(K,1); %assume SE=1 to all users
 end
 
 SEs_target_users = SEs_all_users(:,1);
@@ -69,7 +71,7 @@ all_lambdas = zeros(K,num_total_samples);
 
 if method == 2
 
-for u=1:K
+for u=1:K #K is the number of UE's
     if u<K/2
         all_lambdas(u,:) =  lambdas_all_users(u) * lambda_business;
     else
