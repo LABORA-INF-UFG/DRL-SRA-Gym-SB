@@ -12,8 +12,8 @@ F_D = "2-2"
 
 BLOCKS_EP = 100
 
-GAMMA = 0.7
-GAMMA_D = '07'
+GAMMA = 0.90
+GAMMA_D = '09'
 #LR = 1e-03
 LR = 0.007
 LR_D = '007'

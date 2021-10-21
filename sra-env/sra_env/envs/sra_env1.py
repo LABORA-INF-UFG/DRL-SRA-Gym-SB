@@ -4,6 +4,7 @@ from gym.utils import seeding
 import numpy as np
 import copy
 
+from random import choices
 from akpy.buffers_at_BS import Buffers
 from akpy.MassiveMIMOSystem8 import MassiveMIMOSystem
 from schedulers.max_th import MaxTh
@@ -17,9 +18,9 @@ class SraEnv1(gym.Env):
   def __init__(self,**kwargs):
 
     self.running_tp = 0  # 0 - trainning; 1 - validating
-    self.alpha = 1.0
-    self.beta = 0.0
-    self.gamma = 1.0
+    self.alpha = 1.0 # loss
+    self.beta = 0.0 # delay
+    self.gamma = 1.0 # tx pkts
     try:
       self.alpha = kwargs['alpha']
       self.beta = kwargs['beta']
@@ -81,6 +82,8 @@ class SraEnv1(gym.Env):
     self.tf_folder = kwargs['tf_folder']
     self.tf_folder_acr = kwargs['tf_folder_acr']
     self.mimo_systems = self.makeMIMO(self.F, self.K)
+    self.eps_prob = [1/self.mimo_systems[0].num_episodes for e in range(self.mimo_systems[0].num_episodes)]
+    self.eps_count = [1 for e in range(self.mimo_systems[0].num_episodes)]
     self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F, tp=self.running_tp)
 
     self.history_buffers = []
@@ -157,7 +160,7 @@ class SraEnv1(gym.Env):
       print("Mean RW " + str(np.mean(self.rws)))
       self.rws_hist.append(np.mean(self.rws))
       self.rws = []
-
+    #print(self.eps_count)
     self.curr_block = 0
     self.sub_curr_block = 0
     self.end_ep = True
@@ -322,6 +325,129 @@ class SraEnv1(gym.Env):
     return self.observation_space, [reward, reward_schedulers, pkt_loss, pkt_delay],\
            self.end_ep, info, individual_rw_schedulers, t_pkts_drl
 
+  def step_2(self, action_index):
+    reward_schedulers = []
+    individual_rw_schedulers = []
+    reward = 0
+    pkt_loss = [[] for i in range(len(self.schedulers) + 1)]
+    pkt_delay = [[] for i in range(len(self.schedulers) + 1)]
+    se_hist = [[] for i in range(len(self.schedulers) + 1)]
+    self.compute_rate()  # computing the rates per user
+
+    ## allocation
+    action = self.actions[action_index]
+    for act in action:
+      self.alloc_users[self.curr_freq] = act
+      self.curr_freq += 1
+
+    ## baseline schedulers allocation
+    for sc in self.schedulers:
+      if sc.name == 'Proportional Fair' or sc.name == 'Max th':
+        curr_f = 0
+        sc.exp_thr = self.rates_history[0]
+        ues = sc.policy_action()
+        for u in ues:
+          sc.alloc_users[curr_f].append(u)
+          if len(sc.alloc_users[curr_f]) == sc.F[curr_f]:
+            curr_f += 1
+      elif sc.name == 'Round Robin':
+        for ci, cf in enumerate(self.F):
+          for af in range(cf):
+            ai = sc.policy_action()
+            sc.alloc_users[ci].append(ai)
+    ####################################################
+    ## schedulers - computing the reward
+    for id, sc in enumerate(self.schedulers):
+      rates_pkt_per_s_schedulers = self.rateEstimationUsers(self.F, sc.alloc_users,
+                                                            self.mimo_systems, self.K,
+                                                            self.curr_block, self.packet_size_bits)
+
+      last_SE = self.estimate_SE(self.F, sc.alloc_users, self.mimo_systems, None, self.curr_block)
+
+      if sc.name == 'Max th':
+        sc.update_recent_rate(rate=rates_pkt_per_s_schedulers)
+
+      if sc.name == 'Proportional Fair':
+        sc.update_recent_rate(rate=rates_pkt_per_s_schedulers)
+        for i, v in enumerate(rates_pkt_per_s_schedulers):
+          sc.thr_count[i].append(v)
+      # computing the rewards for each scheduler
+      rws, dpkts, t_pkts = self.rewardCalcSchedulers_(self.mimo_systems, rates_pkt_per_s_schedulers, sc.buffers)
+      reward_schedulers.append(rws)
+      individual_rw_schedulers.append(t_pkts)
+      loss = np.sum(sc.buffers.buffer_history_dropped) / np.sum(sc.buffers.buffer_history_incoming)
+      #pkt_loss[id + 1].append(dpkts)
+      pkt_loss[id + 1].append(loss)
+      pkt_delay[id + 1].append(self.compute_pkt_delay(sc.buffers))
+      std = np.std(pkt_delay[id + 1])  # standard deviation
+      se_hist[id + 1].append(np.mean(last_SE[1]))
+      # clearing alloc users
+      sc.clear()
+      ####################################################
+
+    ## Computing reward for DRL-Agent
+    self.rates_pkt_per_s = self.rateEstimationUsers(self.F, self.alloc_users, self.mimo_systems, self.K,
+                                                    self.curr_block, self.packet_size_bits)
+
+    last_SE = self.estimate_SE(self.F, self.alloc_users, self.mimo_systems, None, self.curr_block)
+
+    # Updating SE per user selected
+    self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
+                                                  self.recent_spectral_eff, self.curr_block)
+
+    reward, dropped_pkt, dropped_pkts_percent_mean, t_pkts_drl = self.rewardCalc_(self.F, self.alloc_users, self.mimo_systems,
+                                                                                  self.K, self.curr_slot,
+                                                                                  self.packet_size_bits,
+                                                                                  [self.rates_pkt_per_s, self.rates],
+                                                                                  self.buffers,
+                                                                                  -100, self.recent_spectral_eff,
+                                                                                  update=True)
+
+    #pkt_loss[0].append(dropped_pkts_percent_mean)
+    loss = np.sum(self.buffers.buffer_history_dropped) / np.sum(self.buffers.buffer_history_incoming)
+    pkt_loss[0].append(loss)
+    pkt_delay[0].append(self.compute_pkt_delay(self.buffers))
+    se_hist[0].append(np.mean(last_SE[1]))
+
+    # resetting the allocated users
+    self.alloc_users = [[] for i in range(len(self.F))]
+
+    self.mimo_systems = self.updateMIMO(self.mimo_systems, self.curr_block)  # Update MIMO conditions
+
+    # updating observation space and reward
+    self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
+                                                 self.max_spectral_eff, self.max_packet_age)
+
+    # resetting
+    self.curr_freq = 0
+    self.curr_slot = 0
+
+    # incrementing slot counter
+    self.curr_block += 1
+
+    if len(self.alloc_users[self.curr_freq]) == self.F[self.curr_freq]:
+      self.curr_freq += 1
+      self.curr_slot += 1
+
+    if (self.curr_block == self.blocks_ep):  # Episode has ended up
+      # before reset, compute the episode loss
+      #loss = np.sum(self.buffers.buffer_history_dropped) / np.sum(self.buffers.buffer_history_incoming)
+      #pkt_loss[0] = loss  # changing the fake value -10 by the real loss value
+      ## schedulers - computing the reward
+      #for id, sc in enumerate(self.schedulers):
+      #  loss = np.sum(sc.buffers.buffer_history_dropped) / np.sum(sc.buffers.buffer_history_incoming)
+      #  pkt_loss[id + 1] = loss  # changing the fake value -10 by the real loss value
+      self.reset_()
+      self.ep_count += 1
+
+    info = {}
+    # print("Episode " + str(self.ep_count) + " - Block " + str(self.curr_block) + " RW " + str(reward))
+    #return self.observation_space, [reward, reward_schedulers, pkt_loss, pkt_delay], self.end_ep, info
+
+    return self.observation_space, [reward, reward_schedulers, pkt_loss, pkt_delay, se_hist],\
+           self.end_ep, info, individual_rw_schedulers, t_pkts_drl
+
+
   def compute_rates(self):
     # rate estimation for all users
     # considering allocation at first frequency (with less BW)
@@ -344,6 +470,17 @@ class SraEnv1(gym.Env):
     self.rates_history.append(np.array(self.rates))
 
   def rewardCalcSchedulers(self, mimo_systems: list, pkt_rate, buffers: Buffers) -> float:  # Calculating reward value
+
+    (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers,
+     dropped_pkts_percent_mean) = self.pktFlow(pkt_rate, buffers, mimo_systems)
+
+    reward =  (tx_pkts * self.packet_size_bits) / 1e6
+
+    individual_thp = [((i * self.packet_size_bits) / 1e6) for i in t_pkts]
+
+    return reward, dropped_pkts_percent_mean, individual_thp
+
+  def rewardCalcSchedulers_(self, mimo_systems: list, pkt_rate, buffers: Buffers) -> float:  # Calculating reward value
 
     (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers,
      dropped_pkts_percent_mean) = self.pktFlow(pkt_rate, buffers, mimo_systems)
@@ -378,8 +515,12 @@ class SraEnv1(gym.Env):
       pkt_rate, self.buffers, self.mimo_systems)
 
     # reward = (self.gamma * (tx_pkts * self.packet_size_bits) / 1e6) - (self.alpha * (dropped_pkts_sum * self.packet_size_bits)/ 1e6)
+    #reward = (self.gamma * ((tx_pkts / occup) * 100)) - (self.alpha * ((dropped_pkts_sum / tx_pkts) * 100))
     reward = (self.gamma * ((tx_pkts / occup) * 100)) - (self.alpha * ((dropped_pkts_sum / tx_pkts) * 100))
-    reward -= self.beta * np.sum(oldest_packet_per_buffer)
+    if np.mean(oldest_packet_per_buffer) > 3:
+      reward -= self.beta * np.mean(oldest_packet_per_buffer)
+    else:
+      reward += self.beta * np.sum(oldest_packet_per_buffer)
     # reward = (self.gamma * (tx_pkts * self.packet_size_bits) / 1e6)
 
     return reward, dropped_pkts_sum, dropped_pkts_percent_mean
@@ -417,6 +558,20 @@ class SraEnv1(gym.Env):
         recent_spectral_eff[u, f] = SE[iu]
     return recent_spectral_eff
 
+  def estimate_SE(self, F: list, alloc_users: list, mimo_systems: list, recent_spectral_eff: np.ndarray,
+                    curr_slot: int):  # Function which update the Spectral efficiency value for each UE used in the last block
+
+    sum_SE = 0.0
+    SE = []
+
+    for f in range(len(F)):
+      au_SE = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f])
+      sum_SE += np.sum(au_SE)
+      for iu, u in enumerate(alloc_users[f]):
+        SE.append(au_SE[iu])
+
+    return (sum_SE, SE)
+
   def estimate_SE_all(self):
     users = list(range(self.K))
     for f in range(len(self.F)):
@@ -452,8 +607,9 @@ class SraEnv1(gym.Env):
     se_flat = spectral_eff.flatten()
     se_flat_norm = se_flat / np.max(se_flat)
 
-    return np.hstack(
-      (buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))  # oldest without normalization
+    #return np.hstack(
+    #  (buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))  # oldest without normalization
+    return np.hstack((buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer_norm))  # oldest without normalization
     #return np.hstack(
     #  (buffer_occupancies_norm, se_flat_norm, oldest_packet_per_buffer_norm))  # normalized
 
@@ -471,6 +627,7 @@ class SraEnv1(gym.Env):
     dropped_pkts_percent = buffers.get_dropped_last_iteration_percent()
     dropped_pkts_percent_mean = np.mean(dropped_pkts_percent)
     incoming_pkts = mimo_systems[0].get_current_income_packets()
+    #self.last_incoming = np.sum(incoming_pkts)
     buffers.packets_arrival(incoming_pkts)  # Updating Buffer
     tx_pkts = np.sum(t_pkts)
 
@@ -487,19 +644,34 @@ class SraEnv1(gym.Env):
     # episode_number = np.random.randint(0, self.mimo_systems[0].num_episodes - 1)
     if self.running_tp == 0:
       self.episode_number = np.random.randint(self.mimo_systems[0].range_episodes_train[0],
-                                         self.mimo_systems[0].range_episodes_train[1])
+                                         self.mimo_systems[0].range_episodes_validate[1])
     else:
       self.episode_number = np.random.randint(self.mimo_systems[0].range_episodes_validate[0],
                                          self.mimo_systems[0].range_episodes_validate[1])
+
+    #if self.running_tp == 0:
+
+    #  self.episode_number = choices(range(self.mimo_systems[0].num_episodes), self.eps_prob)[0]
+
+    #  for e in range(self.mimo_systems[0].num_episodes):
+    #    if e != self.episode_number:
+    #      self.eps_count[e] += 1
+    #  s = sum(self.eps_count)
+    #  self.eps_prob = [self.eps_count[e]/s for e in range(self.mimo_systems[0].num_episodes)]
+
+    #else:
+    #  self.episode_number = np.random.randint(self.mimo_systems[0].range_episodes_validate[0],
+    #                                       self.mimo_systems[0].range_episodes_validate[1])
+
     #self.episode_number = episode_number
-    #if tp == 0:
+    # if tp == 0:
     #  if (self.episode_number + 1) > (self.mimo_systems[0].num_episodes - 1):
     #    self.episode_number = np.random.randint(0, self.mimo_systems[0].num_episodes - 1)
     #  else:
     #    self.episode_number += 1
-    #else:
+    # else:
     #  self.episode_number = np.random.randint(self.mimo_systems[0].range_episodes_validate[0],
-                                           #self.mimo_systems[0].range_episodes_validate[1])
+    #                                        self.mimo_systems[0].range_episodes_validate[1])
 
     for f in range(len(F)):
       # same episode number for all frequencies
