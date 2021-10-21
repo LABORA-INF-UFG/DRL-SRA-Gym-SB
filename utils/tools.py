@@ -24,6 +24,12 @@ class Tools():
             new_data.append(np.hstack(v))
         return new_data
 
+    @staticmethod
+    def compute_raj(throughput):
+        n = len(throughput)
+        fairness_index = np.power(np.sum(throughput), 2) / (n * np.sum(np.power(throughput, 2)))
+        return fairness_index
+
 class NumpyArrayEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
