@@ -7,7 +7,7 @@ import numpy as np
 import copy
 
 import consts
-from akpy.MassiveMIMOSystem6 import MassiveMIMOSystem
+from akpy.MassiveMIMOSystem5 import MassiveMIMOSystem
 from akpy.buffers_at_BS import Buffers
 from schedulers.max_th import MaxTh
 from schedulers.proportional_fair import ProportionalFair
@@ -20,14 +20,15 @@ from itertools import combinations
 from utils.action_space import ActionSpace
 
 '''
-Equal to env6 - novelties:
-1) Using MassiveMIMOSystem6 - dynamically changing the traffic interference file
+Equal to env4 - novelties:
+1) refactoring the channel controller within multiple agents and schedulers
 '''
 
 class SRAEnv(gym.Env):
 
-    def __init__(self, type=None, running_tp=0, desc=None, ti=0):
-        self.__version__ = "0.7.0"
+    def __init__(self, type=None, running_tp=0, desc=None):
+        np.random.seed(0)
+        self.__version__ = "0.6.0"
         self.desc = desc # the agent name
         self.type = type # {Master or Slave} Master will be the env controlling the channels/traffic/interference
         self.running_tp = running_tp # 0 - trainning; 1 - validating -> Dataset separation
@@ -44,8 +45,7 @@ class SRAEnv(gym.Env):
         ## getting combinatorial actions
         self.actions = ActionSpace.get_action_space(K=self.K,F=self.F)
         self.action_space = spaces.Discrete(len(self.actions))
-        # traffic interference file controller
-        self.ti = ti
+
         # Number of slots per Block
         self.slots_block = 2
         # Number of blocks per episode
@@ -93,8 +93,8 @@ class SRAEnv(gym.Env):
         # creating the Round Robin scheduler instance with independent buffers
         #self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
         # another scheduler instance, for testing with multiple schedulers
-        #self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
-        self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
 
         obs = self.reset()
         self.observation_space = spaces.Box(low=0,high=1,shape=obs.shape,dtype=np.float32)
@@ -403,6 +403,7 @@ class SRAEnv(gym.Env):
         max_rate = np.max(thr)
         p_rates = thr / self.buffer_size
 
+        # new models, considering the delay
         self.observation_space = np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))
 
         return self.observation_space
@@ -444,7 +445,7 @@ class SRAEnv(gym.Env):
         return (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean)
 
     def makeMIMO(self, F: list, K: int) -> list:  # Generating MIMO system for each user
-        return [MassiveMIMOSystem(K=K, frequency_index=f + 1, ti=self.ti) for f in range(len(F))]
+        return [MassiveMIMOSystem(K=K, frequency_index=f + 1) for f in range(len(F))]
 
     def loadEpMIMO(self, mimo_systems: list, F: list, tp: int) -> list:
         '''
