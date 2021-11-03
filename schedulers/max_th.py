@@ -18,18 +18,18 @@ class MaxTh(Scheduler):
         self.recent_rate = self.max_rate * np.ones((self.K))  # in bps/Hz
 
     def policy_action_(self) -> int:
+        # used for full observability
         # choose between the throughput available to send or the buffer size to send values
-        buffer_occ = self.buffers.buffer_occupancies * 1.0
-        thr = [[] for f in self.F]
-        bu_count = [0 for f in self.F]
+        buffer_occ = self.buffers.buffer_occupancies * 1.17
+        thr = None
+        bu_count = 0
         best_users = []
         #using QCI information
-        for i, f in enumerate(self.F):
-            thr[i] = np.minimum(self.recent_rate[:,i], buffer_occ)# choose between the throughput available to send or the buffer size to send values
-            for bu in (np.argsort(-1 * thr[i])):
-                if bu not in best_users and bu_count[i] < f:
-                    best_users.append(bu)
-                    bu_count[i] += 1
+        thr = np.minimum(self.recent_rate, buffer_occ)# choose between the throughput available to send or the buffer size to send values
+        for bu in (np.argsort(-1 * thr)):
+            if bu not in best_users and bu_count < np.sum(self.F):
+                best_users.append(bu)
+                bu_count += 1
 
         return best_users
 
@@ -37,7 +37,7 @@ class MaxTh(Scheduler):
         # choose between the throughput available to send or the buffer size to send values
         buffer_occ = self.buffers.buffer_occupancies * 1.0
         #using QCI information
-        thr = np.minimum(self.recent_rate, buffer_occ)# choose between the throughput available to send or the buffer size to send values
+        thr = np.minimum(self.exp_thr, buffer_occ)# choose between the throughput available to send or the buffer size to send values
 
         return (np.argsort(-1 * thr)[: np.sum(self.F)])
 
