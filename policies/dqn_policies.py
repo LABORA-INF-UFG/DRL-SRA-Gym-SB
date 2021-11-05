@@ -9,7 +9,17 @@ class CustomDQNPolicy(FeedForwardPolicy):
                                            layer_norm=False,
                                            feature_extraction="mlp")
 
+class CustomLnMlpPolicy_3layers(LnMlpPolicy):
+    def __init__(self, *args, **kwargs):
+        super(CustomLnMlpPolicy_3layers, self).__init__(*args, **kwargs,
+                                                layers=[128, 128, 512])
+
 class CustomLnMlpPolicy(LnMlpPolicy):
     def __init__(self, *args, **kwargs):
         super(CustomLnMlpPolicy, self).__init__(*args, **kwargs,
-                                                layers=[256, 256, 256])
+                                                layers=[128, 128, 512])
+
+class CustomLnMlpPolicy2(LnMlpPolicy):
+    def __init__(self, *args, **kwargs):
+        super(CustomLnMlpPolicy2, self).__init__(*args, **kwargs,
+                                                layers=[256, 256])
