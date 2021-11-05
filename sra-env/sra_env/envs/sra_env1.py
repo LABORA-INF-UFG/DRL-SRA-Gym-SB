@@ -5,7 +5,7 @@ import numpy as np
 import copy
 
 from random import choices
-from akpy.buffers_at_BS import Buffers
+from akpy.buffers_at_BS_n import Buffers
 from akpy.MassiveMIMOSystem8 import MassiveMIMOSystem
 from schedulers.max_th import MaxTh
 from schedulers.proportional_fair import ProportionalFair
@@ -30,6 +30,11 @@ class SraEnv1(gym.Env):
         np.random.seed(kwargs['seed'])
     except:
       print("Default parameters")
+    self.full_obs = False # or True for full observability
+    try:
+      self.full_obs = kwargs['fullobs']
+    except:
+      print("Default observability : partial")
     self.F = [2, 2]
     self.K = 10
     self.ep_count = 1
@@ -65,6 +70,10 @@ class SraEnv1(gym.Env):
     self.packet_size_bits = 1024  # if 1024, the number of packets per bit coincides with kbps
     self.buffer_size =  30 * 8 * self.packet_size_bits  # size in bits obtained by multiplying by self.packet_size_bits
     self.max_packet_age = 1000  # limits the packet age. Maximum value
+    try:
+      self.max_packet_age = kwargs['max_age']
+    except:
+      print('Default max age')
     self.buffers = Buffers(num_buffers=self.K, buffer_size=self.buffer_size, max_packet_age=self.max_packet_age)
     self.buffers.reset_buffers()  # Initializing buffers
 
@@ -164,7 +173,9 @@ class SraEnv1(gym.Env):
     self.curr_block = 0
     self.sub_curr_block = 0
     self.end_ep = True
-
+    self.rates_history = []
+    # initialization to avoid error in the first run
+    self.rates_history.append([self.buffer_size for i in range(self.K)])
     # Buffer
     self.buffers.reset_buffers()  # Reseting buffers
     # get some traffic to avoid starting from empty buffers
@@ -195,6 +206,9 @@ class SraEnv1(gym.Env):
     self.buffers.reset_buffers()  # Reseting buffers
     # get some traffic to avoid starting from empty buffers
     self.buffers.packets_arrival(self.mimo_systems[0].get_current_income_packets())
+    self.rates_history = []
+    # initialization to avoid error in the first run
+    self.rates_history.append([self.buffer_size for i in range(self.K)])
 
     # MIMO Interference
     self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F, tp=self.running_tp)
@@ -228,8 +242,12 @@ class SraEnv1(gym.Env):
     for sc in self.schedulers:
       if sc.name == 'Proportional Fair' or sc.name == 'Max th':
         curr_f = 0
-        sc.exp_thr = self.rates_history[0]
-        ues = sc.policy_action()
+        sc.exp_thr = self.rates_history[-1]
+        if self.full_obs:
+          ues = sc.policy_action()
+        else:
+          ues = sc.policy_action_()
+
         for u in ues:
           sc.alloc_users[curr_f].append(u)
           if len(sc.alloc_users[curr_f]) == sc.F[curr_f]:
@@ -246,11 +264,12 @@ class SraEnv1(gym.Env):
                                                             self.mimo_systems, self.K,
                                                             self.curr_block, self.packet_size_bits)
 
-      if sc.name == 'Max th':
+      if sc.name == 'Max th' and not self.full_obs:
         sc.update_recent_rate(rate=rates_pkt_per_s_schedulers)
 
       if sc.name == 'Proportional Fair':
-        sc.update_recent_rate(rate=rates_pkt_per_s_schedulers)
+        if not self.full_obs:
+          sc.update_recent_rate(rate=rates_pkt_per_s_schedulers)
         for i, v in enumerate(rates_pkt_per_s_schedulers):
           sc.thr_count[i].append(v)
       # computing the rewards for each scheduler
@@ -345,7 +364,10 @@ class SraEnv1(gym.Env):
       if sc.name == 'Proportional Fair' or sc.name == 'Max th':
         curr_f = 0
         sc.exp_thr = self.rates_history[0]
-        ues = sc.policy_action()
+        if self.full_obs:
+          ues = sc.policy_action_()
+        else:
+          ues = sc.policy_action()
         for u in ues:
           sc.alloc_users[curr_f].append(u)
           if len(sc.alloc_users[curr_f]) == sc.F[curr_f]:
@@ -454,8 +476,9 @@ class SraEnv1(gym.Env):
     rates = []
     for i in range(self.K):
       r = self.rateEstimationUsersAll([self.F[0]], [[i]], self.mimo_systems, self.K,
-                                      self.curr_slot, self.packet_size_bits)
+                                      self.curr_block, self.packet_size_bits)
       rates.append(r[i])
+    self.rates_history.append(np.array(self.rates))
     return rates
 
   def compute_rate(self):
@@ -464,7 +487,8 @@ class SraEnv1(gym.Env):
     middle_index = len(users) // 2
 
     alloc = [users[:middle_index], users[middle_index:]]
-    self.rates = self.rateEstimationUsers(self.F, alloc, self.mimo_systems, self.K,
+    alloc = [users]
+    self.rates = self.rateEstimationUsers([self.F[0]], alloc, self.mimo_systems, self.K,
                                           self.curr_block, self.packet_size_bits)
 
     self.rates_history.append(np.array(self.rates))
@@ -603,19 +627,27 @@ class SraEnv1(gym.Env):
       oldest_packet_per_buffer > max_packet_age] = max_packet_age  # All values above threshold are set to the maximum value allowed
     oldest_packet_per_buffer_norm = oldest_packet_per_buffer / np.max(oldest_packet_per_buffer)  # Normalization
 
-    spectral_eff = np.array(self.recent_spectral_eff)
-    se_flat = spectral_eff.flatten()
-    se_flat_norm = se_flat / np.max(se_flat)
+    if self.full_obs:
+      # estimate individual SE per frequency
+      self.estimate_SE_all()
+      # spectral_eff = self.spectral_eff / np.max(self.spectral_eff)
+      spectral_eff = np.array(self.spectral_eff)
+      se_flat = spectral_eff.flatten()
+      se_flat_norm = se_flat / np.max(se_flat)
+    else:
+      spectral_eff = np.array(self.recent_spectral_eff)
+      se_flat = spectral_eff.flatten()
+      se_flat_norm = se_flat / np.max(se_flat)
 
     #return np.hstack(
     #  (buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))  # oldest without normalization
-    return np.hstack((buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer_norm))  # oldest without normalization
+    return np.hstack((buffer_occupancies, se_flat, oldest_packet_per_buffer_norm))  # oldest without normalization
     #return np.hstack(
     #  (buffer_occupancies_norm, se_flat_norm, oldest_packet_per_buffer_norm))  # normalized
 
 
   # calculation of packets transmission and reception (from transmit_and_receive_new_packets function)
-  def pktFlow(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
+  def pktFlow_(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
           float, float, float, float, float, list):
     present_flow = buffers.buffer_occupancies
     available_rate = np.floor(pkt_rate).astype(int)
@@ -629,6 +661,26 @@ class SraEnv1(gym.Env):
     incoming_pkts = mimo_systems[0].get_current_income_packets()
     #self.last_incoming = np.sum(incoming_pkts)
     buffers.packets_arrival(incoming_pkts)  # Updating Buffer
+    tx_pkts = np.sum(t_pkts)
+
+    return (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean)
+
+  def pktFlow(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
+          float, float, float, float, float, list):
+    present_flow = buffers.buffer_occupancies
+    available_rate = np.floor(pkt_rate).astype(int)
+    t_pkts = available_rate if (np.sum(available_rate) == 0) else buffers.packets_departure(
+      available_rate)  # transmission pkts
+    incoming_pkts = mimo_systems[0].get_current_income_packets()
+    buffers.packets_arrival(incoming_pkts)  # Updating Buffer
+    dropped_pkts = buffers.get_dropped_last_iteration()
+    dropped_pkts_sum = np.sum(dropped_pkts)
+    # getting the percentual dropped of the incoming packages
+    dropped_pkts_percent = buffers.get_dropped_last_iteration_percent()
+    dropped_pkts_percent_mean = np.mean(dropped_pkts_percent)
+
+    #self.last_incoming = np.sum(incoming_pkts)
+
     tx_pkts = np.sum(t_pkts)
 
     return (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean)
