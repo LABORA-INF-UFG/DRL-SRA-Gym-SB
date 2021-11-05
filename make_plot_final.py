@@ -20,25 +20,25 @@ def empty(seq):
         return False
 
 schedulers =[]
-schedulers.append(RoundRobin(K=0, F=[0], buffers=None))
+#schedulers.append(RoundRobin(K=0, F=[0], buffers=None))
 schedulers.append(ProportionalFair(K=0, F=[0], buffers=None))
-schedulers.append(MaxTh(K=0, F=[0], buffers=None))
+#schedulers.append(MaxTh(K=0, F=[0], buffers=None))
 
 plot_colors = ['k', 'c', 'b']
 plot_marks = ['o', 'p', '+']
 plot_lines = ['--', '-.', '--']
 sch_names = ['Round robin', 'Proportional fair', 'Max th']
 
-tqdm_ = "10-101000"
+tqdm_ = "10-300000"
 #tqdm_ = "10-26000"
 t = 50 # avaliation rounds/episodes
 #simulation_type = "stationary"
 simulation_type = "n-stationary"
 F = "_F_" + consts.F_D + "_ME_TI_low1"
 F = "_F_" + consts.F_D + "_high"
-F = "_F_" + consts.F_D + "_low"
+F = "_F_" + consts.F_D + "_all_mixed_ti11"
 #number of schedulers
-n_sch = 3
+n_sch = 1
 tss = []
 
 rewards_drl = []
@@ -244,6 +244,69 @@ for p in plot_data_sorted:
 
 axis2.set_xlabel('Training episodes')
 axis2.set_ylabel('Mean user packet loss (%)')
+#axis2.set_title('Packet loss per episode')
+axis2.legend(loc=7)
+
+
+
+## plotting packet delay
+plot_data = {}
+plot_data_ci = {}
+
+for i,v in enumerate(schedulers):
+    for vi in history['pkt_delay_schedulers']:
+        pkt_d_sch[i].append(np.mean(vi[i]))
+    plot_data[ComputeArea.auc(x=tss, y=pkt_d_sch[i])] = [tss, pkt_d_sch[i], v.name, plot_lines[i], plot_marks[i], plot_colors[i]]
+
+p_pkt_d_1 = history['pkt_delay_agents']['A2C']
+p_pkt_d_5 = history['pkt_delay_agents']['DQN']
+p_pkt_d_6 = history['pkt_delay_agents']['PPO1']
+
+if not empty(p_pkt_d_1):
+    pkt_d_1 = []
+    p_pkt_d_ci_1 = []
+    for i,v in enumerate(p_pkt_d_1):
+        pkt_d_1.append(np.mean(v))
+        vv = np.mean(Tools.matrix_to_vector(v),axis=1)
+        # computing the confidence interval
+        p_pkt_d_ci_1.append(Tools.mean_confidence_interval(vv))
+    plot_data[ComputeArea.auc(x=tss, y=pkt_d_1)] = [tss, pkt_d_1, r'DRL-SRA$_{A2C}$', '-', '^', 'r']
+
+if not empty(p_pkt_d_5):
+    pkt_d_5 = []
+    p_pkt_d_ci_5 = []
+    for i,v in enumerate(p_pkt_d_5):
+        pkt_d_5.append(np.mean(v))
+        vv = np.mean(Tools.matrix_to_vector(v),axis=1)
+        # computing the confidence interval
+        p_pkt_d_ci_5.append(Tools.mean_confidence_interval(vv))
+    plot_data[ComputeArea.auc(x=tss, y=pkt_d_5)] = [tss, pkt_d_5, r'DRL-SRA$_{DQN}$', '-', 'x', 'g']
+
+if not empty(p_pkt_d_6):
+    pkt_d_6 = []
+    p_pkt_d_ci_6 = []
+    for i,v in enumerate(p_pkt_d_6):
+        pkt_d_6.append(np.mean(v))
+        vv = np.mean(Tools.matrix_to_vector(v),axis=1)
+        # computing the confidence interval
+        p_pkt_d_ci_6.append(Tools.mean_confidence_interval(vv))
+    plot_data[ComputeArea.auc(x=tss, y=pkt_d_6)] = [tss, pkt_d_6, r'DRL-SRA$_{PPO1}$', '-', 's', 'm']
+
+# sorting plot data in order to get a plot with desc ordering
+plot_data_sorted = sorted(plot_data.items(),key=lambda x: x[0], reverse=True)
+
+figure, axis2 = plt.subplots(1)
+
+# plotting packet loss
+for p in plot_data_sorted:
+    axis2.plot(tss, p[1][1], label=p[1][2], linestyle=p[1][3], marker=p[1][4], color=p[1][5])
+
+# plotting confidence interval
+#if p_pkt_loss_ci_1:
+#    axis2.fill_between(tss, np.array(p_pkt_loss_ci_1)[:,1], np.array(p_pkt_loss_ci_1)[:,2], color='r', alpha=0.2)
+
+axis2.set_xlabel('Training episodes')
+axis2.set_ylabel('Mean user packet age')
 #axis2.set_title('Packet loss per episode')
 axis2.legend(loc=7)
 

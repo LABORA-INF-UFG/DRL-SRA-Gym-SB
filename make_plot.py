@@ -15,13 +15,13 @@ from utils.save_results import SaveResults
 LR = 0.007
 LR_D= '007'
 tqdm_ = "10-100000"
-t = 500
+t = 100
 simulation_type = "stationary"
 simulation_type = "n-stationary"
 #F = "_F_3-3_NR"
 F = "_F_2-2_ME" # LE = Less Training Episode data = 30 episodes
-F = "_F_1-1_ME" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100
-#F = ""
+#F = "_F_3-3_ME" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100
+#F = "_F_3-3_ME_TI_mixed"
 #F = "_F_3-3_ME_TI_2" # LE = Less Training Episode data = 30 episodes - ME = More TE = 100 - TI traffic int
 # loading the results
 
@@ -139,7 +139,7 @@ for i,v in enumerate(schedulers):
     plot_data[ComputeArea.auc(x=tss, y=pkt_loss_sch[i])] = [tss, pkt_loss_sch[i], v.name, plot_lines[i], plot_marks[i], plot_colors[i]]
 
 # sortind plot data in order to get a plot with desc ordering
-plot_data_sorted = sorted(plot_data.items(),key=lambda x: x[0], reverse=True)
+plot_data_sorted = sorted(plot_data.items(),key=lambda x: x[0], reverse=False)
 # plotting sum-rate plot
 for p in plot_data_sorted:
     axis2.plot(tss, p[1][1], label=p[1][2], linestyle=p[1][3], marker=p[1][4], color=p[1][5])

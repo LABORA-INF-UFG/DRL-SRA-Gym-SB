@@ -1,44 +1,29 @@
-from typing import Tuple
-
 import gym
 from gym import spaces
-import numpy as np
-
-import copy
-
-import consts
 from akpy.MassiveMIMOSystem7 import MassiveMIMOSystem
 #import MassiveMIMOSystem
 from akpy.buffers_at_BS import Buffers
 from schedulers.max_th import MaxTh
 from schedulers.proportional_fair import ProportionalFair
 from schedulers.round_robin import RoundRobin
-
-from keras.utils import to_categorical
-from itertools import combinations
+import matplotlib.pyplot as plt
 
 ### dealing with combinatorial action space
+from training_callback import TrainingCallback
 from utils.action_space import ActionSpace
+from training_callback import TrainingCallback
 
 import sys
 
-from akpy.matlab_tofrom_python import read_several_matlab_arrays_from_mat, read_matlab_array_from_mat
-#from .matlab_tofrom_python import read_matlab_array_from_mat
 import numpy as np
-from scipy.linalg import sqrtm
-#import matplotlib.pyplot as plt
-import os
 import copy
-
-from akpy.util import compare_tensors
-from pathlib import Path
-
-sys.path.insert(1, "/content/drive/MyDrive/canais-drl/")
-
 
 class SRAEnv(gym.Env):
 
-    def __init__(self, gamma=0, alpha=0, beta=0):
+    def __init__(self, gamma=0, alpha=0, beta=0, seed=None):
+        if seed:
+            np.random.seed(seed) # for reproducibility
+        self.episode_number = -1
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
@@ -62,7 +47,7 @@ class SRAEnv(gym.Env):
         # Number of slots per Block
         self.slots_block = 2
         # Number of blocks per episode
-        self.blocks_ep = consts.BLOCKS_EP
+        self.blocks_ep = 1000
         self.curr_slot = 0
         self.curr_block = 0
         self.count_users = 0  # Count number of users allocated in the current frequency
@@ -77,20 +62,30 @@ class SRAEnv(gym.Env):
         self.max_spectral_eff = 7.8  # from dump_SE_values_on_stdout()
         # self.recent_spectral_eff = (self.max_spectral_eff / 2) * np.ones((self.K, len(self.F)))  # in bps/Hz
         self.recent_spectral_eff = (self.max_spectral_eff / len(self.F)) * np.ones((self.K, len(self.F)))  # in bps/Hz
+        self.spectral_eff = (self.max_spectral_eff / len(self.F)) * np.ones((self.K, len(self.F)))  # in bps/Hz
         self.rates_pkt_per_s = np.array([])
         self.min_reward = consts.MIN_REWARD
         self.max_reward = consts.MAX_REWARD
         self.penalty = -10
         self.rws = []
+        self.rws_hist = []
 
         # Buffer variables
         self.packet_size_bits = consts.PACKET_SIZE_BITS  # if 1024, the number of packets per bit coincides with kbps
         self.buffer_size = consts.BUFFER_SIZE # size in bits obtained by multiplying by self.packet_size_bits
-        self.max_packet_age = 50  # limits the packet age. Maximum value
+        self.max_packet_age = 1000  # limits the packet age. Maximum value
         self.buffers = Buffers(num_buffers=self.K, buffer_size=self.buffer_size, max_packet_age=self.max_packet_age)
         self.buffers.reset_buffers()  # Initializing buffers
 
+        # individual rates history
+        self.rates_history = []
+        self.rates = [self.buffer_size for i in range(self.K)]
+        # initialization to avoid error in the first run
+        self.rates_history.append([self.buffer_size for i in range(self.K)])
+
         # Massive MIMO System
+        self.tf_folder = '/traffic_interference_nds_20/'
+        self.tf_folder_acr = 'nds20'
         self.mimo_systems = self.makeMIMO(self.F, self.K)
         self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F, tp=0)
 
@@ -99,57 +94,51 @@ class SRAEnv(gym.Env):
 
         self.schedulers = []
         # creating the Round Robin scheduler instance with independent buffers
-        self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
         # another scheduler instance, for testing with multiple schedulers
-        self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
-        self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+        #self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
 
         obs = self.reset()
         self.observation_space = spaces.Box(low=0,high=1,shape=obs.shape,dtype=np.float32)
-        #self.observation_space = spaces.Box(low=0, high=1, shape=(30,), dtype=np.float32)
-
 
 
     def step(self,action_index):
 
-        # rate estimation for all users
-        rates = []
-        for i in range(self.K):
-            r = self.rateEstimationUsersAll([self.F[0]], [[i]], self.mimo_systems, self.K,
-                                            self.curr_slot, self.packet_size_bits)
-            rates.append(r[i])
-        self.rates = rates
-
         ## allocation
         action = self.actions[action_index]
+        # estimate individual rates
+        self.rates = self.compute_rates()
+        # estimate individual SE per frequency
+        #self.estimate_SE_all()
 
         for act in action:
             self.alloc_users[self.curr_freq] = act
             self.curr_freq += 1
 
-        # incrementing slot counter
-        self.curr_block += 1
-
         self.rates_pkt_per_s = self.rateEstimationUsers(self.F, self.alloc_users, self.mimo_systems, self.K,
-                                                        self.curr_slot, self.packet_size_bits)
+                                                        self.curr_block, self.packet_size_bits)
 
         # Updating SE per user selected
         self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
-                                                      self.recent_spectral_eff, self.curr_slot)
+                                                      self.recent_spectral_eff, self.curr_block)
 
-        reward, _, _ = self.rewardCalc(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_slot,
-                        self.packet_size_bits, [self.rates_pkt_per_s, rates], self.buffers,
-                        self.min_reward, self.recent_spectral_eff, update=True)
+        reward, _, _ = self.rewardCalc(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_block,
+                        self.packet_size_bits, self.rates_pkt_per_s, self.buffers,
+                        self.min_reward, self.recent_spectral_eff)
+        self.rws.append(reward)
 
+        # incrementing slot counter
+        self.curr_block += 1
 
         # resetting the allocated users
         self.alloc_users = [[] for i in range(len(self.F))]
 
-        self.mimo_systems = self.updateMIMO(self.mimo_systems, self.curr_slot)  # Update MIMO conditions
+        self.mimo_systems = self.updateMIMO(self.mimo_systems, self.curr_block)  # Update MIMO conditions
 
         # resetting
         self.curr_freq = 0
-        self.curr_slot = 0
+        #self.curr_slot = 0
 
 
         if (self.curr_block == self.blocks_ep):  # Episode has ended
@@ -166,70 +155,63 @@ class SRAEnv(gym.Env):
 
         return self.observation_space, reward, self.end_ep, info
 
-    def step_(self,action_index):
+    def step_(self, action_index):
         reward_schedulers = []
         reward = 0
         pkt_loss = [[] for i in range(len(self.schedulers) + 1)]
         pkt_delay = [[] for i in range(len(self.schedulers) + 1)]
-
-        # rate estimation for all users
-        rates = []
-        for i in range(self.K):
-            r = self.rateEstimationUsersAll([self.F[0]], [[i]], self.mimo_systems, self.K,
-                                            self.curr_slot, self.packet_size_bits)
-            rates.append(r[i])
-        self.rates = rates
-
+        self.compute_rate()  # computing the rates per user
         ## allocation
         action = self.actions[action_index]
+        self.estimate_SE_all()
+        self.recent_spectral_eff = self.spectral_eff
 
         for act in action:
             self.alloc_users[self.curr_freq] = act
             self.curr_freq += 1
-        self.curr_freq = len(self.F)-1
-
-        if self.type != "Slave":
-            # getting the action selected by round robin scheduler
-            # TODO review in case of new schedulers included
-            for sc in self.schedulers:
-                # gambiarra para não quebrar a atual forma de automação da inclusão de agentes comparadores
-                # assim, para o PF, o policy action já retorna os 3 UEs a serem alocados
-                if sc.name == 'Round Robin':
-                    for ci, cf in enumerate(self.F):
-                        for af in range(cf):
-                            ai = sc.policy_action()
-                            sc.alloc_users[ci].append(ai)
+        self.curr_freq = len(self.F) - 1
 
         ## UEs allocations
-        if (self.curr_freq == (len(self.F)-1)) and \
+        if (self.curr_freq == (len(self.F) - 1)) and \
                 (len(self.alloc_users[self.curr_freq]) == self.F[self.curr_freq]):
             # incrementing slot counter
             self.curr_block += 1
 
-            if self.type != "Slave":
-                ## schedulers
+            if self.type == "Master":
+
+                ## baseline schedulers allocation
                 for sc in self.schedulers:
                     if sc.name == 'Proportional Fair' or sc.name == 'Max th':
                         curr_f = 0
-                        sc.exp_thr = rates
+                        sc.exp_thr = self.rates_history[-2]
                         ues = sc.policy_action()
                         for u in ues:
                             sc.alloc_users[curr_f].append(u)
                             if len(sc.alloc_users[curr_f]) == sc.F[curr_f]:
                                 curr_f += 1
+                    elif sc.name == 'Round Robin':
+                        for ci, cf in enumerate(self.F):
+                            for af in range(cf):
+                                ai = sc.policy_action()
+                                sc.alloc_users[ci].append(ai)
                 ####################################################
                 ## schedulers - computing the reward
                 for id, sc in enumerate(self.schedulers):
                     rates_pkt_per_s_schedulers = self.rateEstimationUsers(self.F, sc.alloc_users,
                                                                           self.mimo_systems, self.K,
-                                                                          self.curr_slot, self.packet_size_bits)
+                                                                          self.curr_block, self.packet_size_bits)
+                    # saving the recent rate
+                    # for i, rt in enumerate(self.rates):
+                    #    self.rates[i] = rates_pkt_per_s_schedulers[i]
+
                     if sc.name == 'Proportional Fair':
                         for i, v in enumerate(rates_pkt_per_s_schedulers):
                             sc.thr_count[i].append(v)
                     # computing the rewards for each scheduler
                     rws, dpkts = self.rewardCalcSchedulers(self.mimo_systems, rates_pkt_per_s_schedulers, sc.buffers)
                     reward_schedulers.append(rws)
-                    pkt_loss[id + 1].append(dpkts)
+                    # pkt_loss[id + 1].append(dpkts)
+                    pkt_loss[id + 1] = -10.
                     pkt_delay[id + 1].append(self.compute_pkt_delay(sc.buffers))
                     # clearing alloc users
                     sc.clear()
@@ -237,24 +219,31 @@ class SRAEnv(gym.Env):
 
             ## Computing reward for DRL-Agent
             self.rates_pkt_per_s = self.rateEstimationUsers(self.F, self.alloc_users, self.mimo_systems, self.K,
-                                                            self.curr_slot, self.packet_size_bits)
+                                                            self.curr_block, self.packet_size_bits)
 
             # Updating SE per user selected
             self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
-                                                          self.recent_spectral_eff, self.curr_slot)
+                                                          self.recent_spectral_eff, self.curr_block)
+            #self.spectral_eff = self.recent_spectral_eff
 
-            reward, dropped_pkt, dropped_pkts_percent_mean = self.rewardCalc(self.F, self.alloc_users, self.mimo_systems, self.K, self.curr_slot,
-                                                   self.packet_size_bits, [self.rates_pkt_per_s, rates], self.buffers,
-                                                   self.min_reward, self.recent_spectral_eff, update=True)
+            reward, dropped_pkt, dropped_pkts_percent_mean = self.rewardCalc_(self.F, self.alloc_users,
+                                                                              self.mimo_systems, self.K, self.curr_slot,
+                                                                              self.packet_size_bits,
+                                                                              [self.rates_pkt_per_s, self.rates],
+                                                                              self.buffers,
+                                                                              self.min_reward, self.recent_spectral_eff,
+                                                                              update=True)
 
-            pkt_loss[0].append(dropped_pkts_percent_mean)
+            # pkt_loss[0].append(dropped_pkts_percent_mean)
+            # returning a fake packet loss. The real loss will be calculated at the reset
+            pkt_loss[0] = -10.
 
             pkt_delay[0].append(self.compute_pkt_delay(self.buffers))
 
             # resetting the allocated users
             self.alloc_users = [[] for i in range(len(self.F))]
 
-            self.mimo_systems = self.updateMIMO(self.mimo_systems, self.curr_slot)  # Update MIMO conditions
+            self.mimo_systems = self.updateMIMO(self.mimo_systems, self.curr_block)  # Update MIMO conditions
 
             # updating observation space and reward
             self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
@@ -264,31 +253,31 @@ class SRAEnv(gym.Env):
             self.curr_freq = 0
             self.curr_slot = 0
 
-
         if len(self.alloc_users[self.curr_freq]) == self.F[self.curr_freq]:
             self.curr_freq += 1
             self.curr_slot += 1
 
         if (self.curr_block == self.blocks_ep):  # Episode has ended
+            # before reset, compute the episode loss
+            loss = np.sum(self.buffers.buffer_history_dropped) / np.sum(self.buffers.buffer_history_incoming)
+            pkt_loss[0] = loss  # changing the fake value -10 by the real loss value
+            ## schedulers - computing the reward
+            for id, sc in enumerate(self.schedulers):
+                loss = np.sum(sc.buffers.buffer_history_dropped) / np.sum(sc.buffers.buffer_history_incoming)
+                pkt_loss[id + 1] = loss  # changing the fake value -10 by the real loss value
             self.reset()
             self.ep_count += 1
 
-
-
         info = {}
-        # print("Episode " + str(self.ep_count) + " - Block " + str(self.curr_block))
+        # print("Episode " + str(self.ep_count) + " - Block " + str(self.curr_block) + " RW " + str(reward))
         return self.observation_space, [reward, reward_schedulers, pkt_loss, pkt_delay], self.end_ep, info
 
 
     def rewardCalc(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int, packet_size_bits: int,
-                   pkt_rate, buffers: Buffers, min_reward: int, SE: list, update) -> float:  # Calculating reward value
-
-        occup = np.sum(buffers.buffer_occupancies)
+                   pkt_rate, buffers: Buffers, min_reward: int, SE: list) -> float:  # Calculating reward value
 
         buffer_states = buffers.get_buffer_states()
-
-        # Buffer occupancy
-        buffer_occupancies = buffer_states[0] / self.buffer_size
+        occup = np.sum(buffers.buffer_occupancies)
 
         # Oldest packets
         oldest_packet_per_buffer = buffer_states[1]
@@ -296,54 +285,36 @@ class SRAEnv(gym.Env):
         oldest_packet_per_buffer[oldest_packet_per_buffer > self.max_packet_age] = self.max_packet_age
         # Normalization
         #oldest_packet_per_buffer = oldest_packet_per_buffer / self.max_packet_age
+        (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean) = self.pktFlow(pkt_rate,
+                                                                                                                            buffers,
+                                                                                                                            mimo_systems)
+        ## funcionando para o novo dataset -> gamma = 10, alpha = 100 e beta = 0 (MT) vs beta = 100 (PF)
+        #reward = (self.gamma * (tx_pkts*self.packet_size_bits)/1e6) - (self.alpha * (dropped_pkts_sum*self.packet_size_bits)/1e6)
+        #reward -= self.beta * np.sum(oldest_packet_per_buffer)
+        #print("Rw= " + str(reward) + ' -- tx ' + str(tx_pkts) + ' -- loss ' + str(dropped_pkts_sum) + ' -- oldest sum'
+        #      + str(np.sum(oldest_packet_per_buffer)))
+        #print("rate " + str((tx_pkts*self.packet_size_bits)/1e6))
+        #print("loss " + str((dropped_pkts_sum * self.packet_size_bits) / 1e6))
 
-        if not update:
-            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlowNoUpdate(pkt_rate[0],
-                                                                                                             buffers,
-                                                                                                             mimo_systems)
 
-            reward = 10 * (tx_pkts / 50000) - 100 * (dropped_pkts_sum / (tx_pkts + 1))
-        else:
-            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean) = self.pktFlow(pkt_rate[0],
-                                                                                                     buffers,
-                                                                                                     mimo_systems)
-            #reward = 10 * (tx_pkts / 50000)  - self.alpha * (dropped_pkts_sum / (tx_pkts + 1))
-
-            #if np.sum(oldest_packet_per_buffer) < 25:
-            #  reward += self.beta * np.sum(oldest_packet_per_buffer)
-            #else:
-            #  reward -= self.beta * np.sum(oldest_packet_per_buffer)
-
-            #reward = (((self.gamma * tx_pkts) / (self.alpha * dropped_pkts_sum))-1)  - (self.beta * (np.sum(oldest_packet_per_buffer) / 100))
-            #reward = (self.gamma * (tx_pkts / 1e6)) - (self.alpha * (dropped_pkts_sum / 1e6)) - (self.beta * (np.sum(oldest_packet_per_buffer) / 100))
-            reward = (self.gamma * ((tx_pkts / occup)*100)) - (self.alpha * ((dropped_pkts_sum / occup)*100)) - (self.beta * (np.mean(oldest_packet_per_buffer)))
-            print([str(reward) + " tx_pkts = " + str((tx_pkts / occup)*100) +
-                   " dropped = " + str((dropped_pkts_sum/occup)*100) + " delay = " + str(np.mean(oldest_packet_per_buffer)) + " - g="
-                   + str(self.gamma) + " - a=" + str(self.alpha) + " - b=" + str(self.beta)])
-
-        #if reward < 0:
-        #    reward = self.min_reward if reward < self.min_reward else reward  # Impose a minimum vale for reward
+        #reward = (self.gamma * (tx_pkts * self.packet_size_bits) / 1e6) - (self.alpha * (dropped_pkts_sum * self.packet_size_bits)/ 1e6)
+        reward = (self.gamma * ((tx_pkts / occup) * 100)) - (self.alpha * ((dropped_pkts_sum / tx_pkts) * 100))
+        reward -= self.beta * np.sum(oldest_packet_per_buffer)
+        #reward = (self.gamma * (tx_pkts * self.packet_size_bits) / 1e6)
 
         return reward, dropped_pkts_sum, dropped_pkts_percent_mean
 
     def rewardCalc_(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int, packet_size_bits: int,
                    pkt_rate, buffers: Buffers, min_reward: int, SE: list, update) -> float:  # Calculating reward value
-        if not update:
-            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlowNoUpdate(pkt_rate[0],
-                                                                                                             buffers,
-                                                                                                             mimo_systems)
 
-            reward = 10 * (tx_pkts / 50000) - 100 * (dropped_pkts_sum / (tx_pkts + 1))
-        else:
-            (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers) = self.pktFlow(pkt_rate[0],
-                                                                                                     buffers,
-                                                                                                     mimo_systems)
-            reward = 10 * (tx_pkts / 50000)
+        (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers,
+         dropped_pkts_percent_mean) = self.pktFlow(pkt_rate[0],
+                                                   buffers,
+                                                   mimo_systems)
+        reward = (tx_pkts * self.packet_size_bits) / 1e6
 
-        if reward < 0:
-            reward = self.min_reward if reward < self.min_reward else reward  # Impose a minimum vale for reward
 
-        return reward, dropped_pkts_sum
+        return reward, dropped_pkts_sum, dropped_pkts_percent_mean
 
     def rateEstimationUsersAll(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int,
                                packet_size_bits: int) -> list:  # Calculates the rate per second for each user considering if it was selected to transmit in any frequency and
@@ -351,9 +322,9 @@ class SRAEnv(gym.Env):
 
         for f in range(len(F)):
             for au in alloc_users[f]:
-                se_freq = mimo_systems[f].SE_for_given_sample(curr_slot, [au], F[f], avoid_estimation_errors=False)
-                rates = (se_freq * mimo_systems[f].BW) / packet_size_bits
-                rates_pkt_per_s[au] = rates[au]
+                se_freq = mimo_systems[f].SE_current_sample(curr_slot, [au])
+                rates = (se_freq[0] * mimo_systems[f].BW[f]) / packet_size_bits
+                rates_pkt_per_s[au] = rates
         return rates_pkt_per_s
 
     def rateEstimationUsers(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int,
@@ -361,18 +332,29 @@ class SRAEnv(gym.Env):
         rates_pkt_per_s = np.zeros((K,))  # Considering rates are per second
 
         for f in range(len(F)):
-            se_freq = mimo_systems[f].SE_for_given_sample(curr_slot, alloc_users[f], F[f],
-                                                          avoid_estimation_errors=False)
-            rates_pkt_per_s += (se_freq * mimo_systems[f].BW) / packet_size_bits
+            se_freq = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f])
+            #se_freq = mimo_systems[f].SE_for_given_sample(curr_slot, alloc_users[f], F[f],
+            #                                              avoid_estimation_errors=False)
+            for iu, u in enumerate(alloc_users[f]):
+                rates_pkt_per_s[u] += (se_freq[iu] * mimo_systems[f].BW[f]) / packet_size_bits
 
         return rates_pkt_per_s
 
     def updateSEUsers(self, F: list, alloc_users: list, mimo_systems: list, recent_spectral_eff: np.ndarray,
                       curr_slot: int):  # Function which update the Spectral efficiency value for each UE used in the last block
         for f in range(len(F)):
-            SE = mimo_systems[f].SE_for_given_sample(curr_slot, alloc_users[f], F[f], avoid_estimation_errors=False)
-            recent_spectral_eff[alloc_users[f], f] = SE[alloc_users[f]]
+            SE = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f])
+            for iu, u in enumerate(alloc_users[f]):
+                recent_spectral_eff[u, f] = SE[iu]
         return recent_spectral_eff
+
+    def estimate_SE_all(self):
+        users = list(range(self.K))
+        for f in range(len(self.F)):
+            SE = self.mimo_systems[f].SE_current_sample(self.curr_block, users)
+            for iu, u in enumerate(users):
+                self.spectral_eff[u, f] = SE[iu]
+
 
     def updateMIMO(self, mimo_systems: list,
                    curr_slot: int) -> list:  # Updating MIMO environment to the next slot, recalculating interferences
@@ -389,16 +371,23 @@ class SRAEnv(gym.Env):
 
         # Buffer occupancy
         buffer_occupancies = buffer_states[0] / buffer_size
+        buffer_occupancies = np.array(buffer_occupancies*100).astype(int)
 
         # Oldest packets
         oldest_packet_per_buffer = buffer_states[1]
         oldest_packet_per_buffer[
             oldest_packet_per_buffer > max_packet_age] = max_packet_age  # All values above threshold are set to the maximum value allowed
-        oldest_packet_per_buffer = oldest_packet_per_buffer / max_packet_age  # Normalization
+        #oldest_packet_per_buffer = oldest_packet_per_buffer / np.max(oldest_packet_per_buffer)  # Normalization
 
         # Spectral efficiency
-        spectral_eff = recent_spectral_eff / max_spectral_eff
+        #spectral_eff = recent_spectral_eff / max_spectral_eff
 
+        # new spectral eff
+        # estimate individual SE per frequency
+        self.estimate_SE_all()
+        #spectral_eff = self.spectral_eff / np.max(self.spectral_eff)
+        spectral_eff = np.array(self.spectral_eff).astype(int)
+        #spectral_eff = self.spectral_eff
         # original
         # return np.hstack((buffer_occupancies, oldest_packet_per_buffer, spectral_eff.flatten()))
         # simplificando o estado
@@ -407,13 +396,9 @@ class SRAEnv(gym.Env):
         thr = np.minimum(self.rates, self.buffers.buffer_occupancies)
         max_rate = np.max(thr)
         p_rates = thr / self.buffer_size
-        #return np.hstack((buffer_occupancies, spectral_eff.flatten(), p_rates.flatten(), oldest_packet_per_buffer))
-        #return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()))
-        # using matrix state - models - run_simulation2.py
-        #return np.array([p_rates.flatten(), buffer_occupancies, spectral_eff.flatten()]).astype(np.float32)
-        #using vector state - models2 - run_simulation3.py
-        return np.hstack((p_rates.flatten(), buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))
-        #return np.hstack((p_rates.flatten(), oldest_packet_per_buffer, spectral_eff.flatten()))
+
+        return np.hstack((buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))# oldest without normalization
+        #return np.hstack((buffer_occupancies, spectral_eff.flatten()))
 
     # calculation of packets transmission and reception (from transmit_and_receive_new_packets function)
     def pktFlowNoUpdate(self, pkt_rate: float, buffers: Buffers, mimo_systems: list) -> (
@@ -450,7 +435,7 @@ class SRAEnv(gym.Env):
         return (tx_pkts, dropped_pkts_sum, dropped_pkts, t_pkts, incoming_pkts, buffers, dropped_pkts_percent_mean)
 
     def makeMIMO(self, F: list, K: int) -> list:  # Generating MIMO system for each user
-        return [MassiveMIMOSystem(K=K, frequency_index=f + 1) for f in range(len(F))]
+        return [MassiveMIMOSystem(K=K, frequency_index=f + 1, tf_folder=self.tf_folder) for f in range(len(F))]
 
     def loadEpMIMO(self, mimo_systems: list, F: list, tp: int) -> list:
         '''
@@ -464,6 +449,7 @@ class SRAEnv(gym.Env):
         else:
             episode_number = np.random.randint(self.mimo_systems[0].range_episodes_validate[0],
                                                self.mimo_systems[0].range_episodes_validate[1])
+        self.episode_number = episode_number
         for f in range(len(F)):
             # same episode number for all frequencies
             self.mimo_systems[f].load_episode(episode_number)
@@ -471,8 +457,11 @@ class SRAEnv(gym.Env):
         return mimo_systems
 
     def reset(self):  # Required by script to initialize the observation space
-
-        self.rws = []
+        if self.running_tp == 0:
+            if len(self.rws) > 0:
+                print("Mean RW " + str(np.mean(self.rws)))
+                self.rws_hist.append(np.mean(self.rws))
+                self.rws = []
         self.curr_block = 0
         self.end_ep = True
         # Cleaning count of users
@@ -505,15 +494,66 @@ class SRAEnv(gym.Env):
 
         return self.observation_space
 
+    def reset_pre(self):  # Required by script to initialize the observation space
+        '''
+        simplified version to only reset the buffers
+        '''
+        self.rws = []
+        self.curr_block = 0
+        #self.end_ep = True
+        # Cleaning count of users
+        self.c_users = np.zeros(self.K)
+
+        if self.type != "Slave":
+            # Buffer
+            self.buffers.reset_buffers()  # Reseting buffers
+            # get some traffic to avoid starting from empty buffers
+            self.buffers.packets_arrival(self.mimo_systems[0].get_current_income_packets())
+
+            # reseting the schedulers
+            for sc in self.schedulers:
+                sc.reset()
+                sc.buffers = copy.deepcopy(self.buffers)
+
+        else:
+            master_env = self.par_envs['Master'][0]
+            self.mimo_systems = copy.deepcopy(master_env.mimo_systems)
+            self.buffers = copy.deepcopy(master_env.buffers)
+
+
+
+        self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
+                                                     self.max_spectral_eff, self.max_packet_age)
+        self.ep_count += 1
+
+        return self.observation_space
+
+    def compute_rate(self):
+        # rate estimation for all users
+        users = list(range(self.K))
+        middle_index = len(users) // 2
+
+        alloc = [users[:middle_index], users[middle_index:]]
+        self.rates = self.rateEstimationUsers(self.F, alloc, self.mimo_systems, self.K,
+                                              self.curr_block, self.packet_size_bits)
+
+        self.rates_history.append(np.array(self.rates))
+
     def close(self):
         pass
 
     def render(self):
         pass
-        # print("----------------------------")
-        # print("Episode " + str(self.ep_count))
-        # print("Block " + str(self.curr_block))
-        # print(self.buffers.buffer_occupancies)
+
+    def compute_rates(self):
+        # rate estimation for all users
+        # considering allocation at first frequency (with less BW)
+        rates = []
+        for i in range(self.K):
+            r = self.rateEstimationUsersAll([self.F[0]], [[i]], self.mimo_systems, self.K,
+                                            self.curr_slot, self.packet_size_bits)
+            rates.append(r[i])
+        return rates
 
 
     def rewardCalcSchedulers(self, mimo_systems: list, pkt_rate, buffers: Buffers) -> float:  # Calculating reward value
@@ -531,52 +571,67 @@ class SRAEnv(gym.Env):
         oldest_packet_per_buffer = buffer_states[1]
         return oldest_packet_per_buffer
 
+    def set_seed(self, seed):
+        np.random.seed(seed)  # for reproducibility
 
-import sys
-
-sys.path.insert(1, "/content/drive/MyDrive/DRL-SRA-Gym/")
-from stable_baselines.common.policies import MlpPolicy
+from stable_baselines.common.policies import MlpPolicy, MlpLnLstmPolicy
+from stable_baselines.common.policies import MlpLnLstmPolicy
 from stable_baselines.deepq.policies import MlpPolicy as mlpp
-from stable_baselines.common.policies import CnnLnLstmPolicy as policy
-from model_eval import ModelEval
+from stable_baselines.deepq.policies import LnMlpPolicy
+from stable_baselines.deepq.policies import CnnPolicy
 from stable_baselines import A2C, ACKTR, TRPO, ACER, DQN, PPO1, PPO2
-# from sra_env.sra_env3 import SRAEnv
 from tqdm import tqdm
 import consts as consts
-import sys
-import os
+from policies.dqn_policies import CustomDQNPolicy
+from policies.dqn_policies import CustomLnMlpPolicy
+from policies.custom_policies import CustomMlpPolicy
 
-for alpha in [0.5]:
+training_eps = 10
+
+for alpha in [1]:
     alpha_t = str(alpha).replace(".", "")
 
-    for gamma in [0.3, 0.2, 0.1, 0.0]:
+    for gamma in [1]:
 
         gamma_t = str(gamma).replace(".", "")
 
         # for beta in [0.1]:
-        beta = 1.0 - alpha - gamma
+        #beta = 1.0 - alpha - gamma
+        beta = 0.0
         beta_t = str(beta).replace(".", "")
         env = SRAEnv(gamma=gamma, alpha=alpha, beta=beta)
         env.running_tp = 0
         model1, model2, model3, model4, model5, model6, model7 = None, None, None, None, None, None, None
 
-        # model1 = A2C(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR, epsilon=consts.EPSILON)
-        # model2 = ACKTR(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
-        # model3 = TRPO(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, vf_stepsize=consts.LR)
-        # model4 = ACER(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
-        model5 = DQN(mlpp, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
-        # model6 = PPO1(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, adam_epsilon=consts.EPSILON)
+        env_eval = SRAEnv(gamma=gamma, alpha=alpha, beta=beta, seed=10)
+        env_eval.running_tp = 1
+        env_eval.blocks_ep = 100
+        model_name = "DQN_tf_fixed_rate_g" + gamma_t + "_a" + alpha_t + "_b" + beta_t+"gamma_" \
+                     + consts.GAMMA_D + "_lr_" + consts.LR_D + '_epsilon_' + consts.EPSILON_D + '_simple'
+        folder = 'E:/Docs_Doutorado/models_new_dataset2/'
+
+        training_cbk_md1 = TrainingCallback(eval_interval=1000, episode_length=1000, env_eval=env_eval,
+                                            model_name=model_name, folder=folder, save=False)
+
+        #model1 = A2C(CustomMlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR, epsilon=consts.EPSILON)
+        #model2 = ACKTR(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
+        #model3 = TRPO(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, vf_stepsize=consts.LR)
+        #model4 = ACER(CustomMlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
+        #model5 = DQN(mlpp, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
+        model5 = DQN(CustomLnMlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
+        #model6 = PPO1(CustomMlpPolicy, env, verbose=0, gamma=consts.GAMMA, adam_epsilon=consts.EPSILON)
         # model7 = PPO2(MlpPolicy, env, verbose=0, gamma=consts.GAMMA, learning_rate=consts.LR)
 
         # rr = list(range(10,30011,40000))
-        rr = list(range(150000, 150001, 50000))
+        #rr = list(range(20000, 500001, 10000))
+        rr = list(range(30000, 30001, 500000))
         # rr = list(range(24000,29001,1000))
-        # rr.append(10)
+        #rr.append(10)
         # rr = list(range(100000, 100001, 50000))
-        # rr.sort()
+        rr.sort()
         tqdm_e = tqdm(rr, desc='Time Steps', leave=True, unit=" time steps")
 
-        folder = 'E:/Docs_Doutorado/multi_alfa_beta_nrw/'
+        folder = 'E:/Docs_Doutorado/models_new_dataset3/'
 
         ## loading the previous trained model
         # model1.load_parameters(folder + 'a2c_drl_23000_F_2-2_low_gamma_07_lr_007_epsilon_1e-05', exact_match=True)
@@ -585,29 +640,69 @@ for alpha in [0.5]:
 
         training_start = 0  # last trained model
 
-        F = "_F_" + consts.F_D + "_all_ti11_g" + gamma_t + "_a" + alpha_t + "_b" + beta_t
-        base_file = F + "_gamma_" + consts.GAMMA_D + "_lr_" + consts.LR_D + '_epsilon_' + consts.EPSILON_D
+        # _b indica que é um novo rw
+        #   - > reward = (self.gamma * ((tx_pkts / occup)*100)) - (self.alpha * ((dropped_pkts_sum / occup)*100)) - (self.beta * (np.mean(oldest_packet_per_buffer)))
+        #
+        # sem _b indica que é o rw "tradicional"
+        #
+
+        F = "_F_" + consts.F_D + "_" + env.tf_folder_acr + "_g" + gamma_t + "_a" + alpha_t + "_b" + beta_t
+        base_file = F + "_gamma_" + consts.GAMMA_D + "_lr_" + consts.LR_D + '_epsilon_' + consts.EPSILON_D + '_9_custon_policy'
 
         # model6.load_parameters(folder + 'ppo1_100000_F_2-2_low_all_v2_gamma_07_lr_007_epsilon_1e-05', exact_match=True)
 
         for ts in tqdm_e:
+
+            episodes = int(ts / env.blocks_ep)
 
             if model1:
                 # if ts > 3000:
                 # ppo1_3000_F_2-2_all_ti11_delay_focusv3_gamma_07_lr_007_epsilon_1e-05
                 # model1.load_parameters(folder + 'a2c_drl_'+ str(ts - 1000) +'_F_2-2_all_ti11_delay_focusv3_gamma_07_lr_007_epsilon_1e-05', exact_match=True)
                 model1.learn(total_timesteps=ts)  # time steps
-                model1.save(folder + "a2c_drl_" + str(ts) + base_file)
+                model1.save(folder + "a2c_drl_" + str(episodes) + base_file)
+                #figure, axis1 = plt.subplots(1)
+                #axis1.plot(env.rws_hist)
+                #plt.show()
+
+            if model2:
+                model2.learn(total_timesteps=ts, callback=training_cbk_md1)
+                model2.save(folder + "acktr_" + str(episodes) + base_file)
+                figure, axis1 = plt.subplots(1)
+                axis1.plot(env.rws_hist)
+                plt.show()
+
+            if model3:
+                model3.learn(total_timesteps=ts, callback=training_cbk_md1)
+                model3.save(folder + "trpo_" + str(episodes) + base_file)
+                figure, axis1 = plt.subplots(1)
+                axis1.plot(env.rws_hist)
+                plt.show()
+
+            if model4:
+                model4.learn(total_timesteps=ts, callback=training_cbk_md1)
+                model4.save(folder + "acer_" + str(episodes) + base_file)
+                figure, axis1 = plt.subplots(1)
+                axis1.plot(env.rws_hist)
+                plt.show()
 
             if model5:
                 # if ts > 3000:
                 # model5.load_parameters(folder +"dqn_" + str(ts)+base_file, exact_match=True)
+                #model5.learn(total_timesteps=ts, callback=training_cbk_md1)
                 model5.learn(total_timesteps=ts)
-                model5.save(folder + "dqn_" + str(ts) + base_file)
+                #model5.save(folder + "dqn_" + str(episodes) + base_file)
+                print(env.rws_hist)
+                figure, axis1 = plt.subplots(1)
+                axis1.plot(env.rws_hist)
+                plt.show()
 
             if model6:
-                # if ts > 3000:
-                # model6.load_parameters(folder + 'ppo1_'+ str(ts - 1000) +'_F_2-2_all_ti11_delay_focusv3_gamma_07_lr_007_epsilon_1e-05', exact_match=True)
-                model6.learn(total_timesteps=ts)
-                model6.save(folder + "ppo1_" + str(ts) + base_file)
+                model6.learn(total_timesteps=ts, callback=training_cbk_md1)
+                model6.save(folder + "ppo1_" + str(episodes) + base_file)
+                figure, axis1 = plt.subplots(1)
+                axis1.plot(env.rws_hist)
+                plt.show()
 
+        print("errors:")
+        print(training_cbk_md1.error)

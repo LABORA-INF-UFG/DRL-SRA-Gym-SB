@@ -4,7 +4,7 @@ from stable_baselines.common.env_checker import check_env
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.deepq.policies import MlpPolicy as mlpp
 from stable_baselines import A2C, ACKTR, TRPO, ACER, DQN, PPO1, PPO2
-from sra_env.sra_env1 import SRAEnv
+from sra_env_old.sra_env5 import SRAEnv
 from tqdm import tqdm
 import consts
 

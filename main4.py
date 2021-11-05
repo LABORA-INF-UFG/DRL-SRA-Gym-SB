@@ -4,7 +4,7 @@ from stable_baselines.common.env_checker import check_env
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.deepq.policies import MlpPolicy as mlpp
 from stable_baselines import A2C, ACKTR, TRPO, ACER, DQN, PPO1, PPO2
-from sra_env.sra_env6 import SRAEnv
+from sra_env.sra_env4 import SRAEnv
 from tqdm import tqdm
 import consts
 import sys
@@ -39,7 +39,7 @@ if 'PPO2' in sys.argv:
 #folder = consts.MODELS_FOLDER_STATIONARY
 #folder = consts.MODELS_FOLDER
 
-rr = list(range(100000,300001,100000))
+rr = list(range(10,30,10))
 #rr.append(10)
 #rr.sort()
 tqdm_e = tqdm(rr, desc='Time Steps', leave=True, unit=" time steps")

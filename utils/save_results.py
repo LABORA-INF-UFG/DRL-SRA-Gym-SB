@@ -29,6 +29,11 @@ class SaveResults:
             json.dump(data, outfile, cls=NumpyArrayEncoder)
 
     @staticmethod
+    def save_history_in_file(file, data):
+        with open(file, 'w') as outfile:
+            json.dump(data, outfile, cls=NumpyArrayEncoder)
+
+    @staticmethod
     def load_history(file=''):
         fl = file if file != '' else 'data/history.json'
         with open(fl, "r") as read_file:

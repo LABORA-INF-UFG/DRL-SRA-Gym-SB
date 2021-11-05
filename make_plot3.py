@@ -12,14 +12,15 @@ train_models.py for training body, using training_callback.py and model_eval.py 
 '''
 
 tqdm_ = "10-10000"
-t = 2 # avaliation rounds
+t = 100 # avaliation rounds
 #simulation_type = "stationary"
 simulation_type = "n-stationary"
 F = "_F_" + consts.F_D + "_ME"
 #number of schedulers
 n_sch = 3
 
-tqdm_e = tqdm(range(10,21,10), desc='Time Steps', leave=True, unit=" time steps")
+#tqdm_e = tqdm(range(10,5991,10), desc='Time Steps', leave=True, unit=" time steps")
+tqdm_e = tqdm(range(1000,23010,1000), desc='Time Steps', leave=True, unit=" time steps")
 
 tss = []
 
@@ -33,7 +34,7 @@ pkt_d_sch = [[] for i in range(n_sch)]
 for i in tqdm_e:
 
     #n-stationary_F_2-2_ME_5_rounds_100_bloks_eps_lr_007_10_episodes
-    f = 'history_final_p/' + simulation_type + F + "_" + str(t) + '_rounds_' + str(consts.BLOCKS_EP) + '_bloks_eps_lr_' + consts.LR_D + '_' + str(i) + '_episodes.json'
+    f = 'history_final_p2/' + simulation_type + F + "_" + str(t) + '_rounds_' + str(consts.BLOCKS_EP) + '_bloks_eps_lr_' + consts.LR_D + '_' + str(i) + '_episodes.json'
     history = SaveResults.load_history(f)
 
     ## creating plot data
