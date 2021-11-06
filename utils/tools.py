@@ -30,6 +30,12 @@ class Tools():
         fairness_index = np.power(np.sum(throughput), 2) / (n * np.sum(np.power(throughput, 2)))
         return fairness_index
 
+    @staticmethod
+    def moving_average(a, n=3):
+        ret = np.cumsum(a, dtype=float)
+        ret[n:] = ret[n:] - ret[:-n]
+        return ret[n - 1:] / n
+
 class NumpyArrayEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
