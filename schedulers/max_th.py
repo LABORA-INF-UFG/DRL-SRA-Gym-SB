@@ -17,10 +17,10 @@ class MaxTh(Scheduler):
         #self.recent_rate = self.max_rate * np.ones((self.K, len(self.F)))  # in bps/Hz
         self.recent_rate = self.max_rate * np.ones((self.K))  # in bps/Hz
 
+    # partial obs
     def policy_action_(self) -> int:
-        # used for full observability
         # choose between the throughput available to send or the buffer size to send values
-        buffer_occ = self.buffers.buffer_occupancies * 1.17
+        buffer_occ = self.buffers.buffer_occupancies *  1 #1.17
         thr = None
         bu_count = 0
         best_users = []
@@ -33,6 +33,7 @@ class MaxTh(Scheduler):
 
         return best_users
 
+    # full obs
     def policy_action(self) -> int:
         # choose between the throughput available to send or the buffer size to send values
         buffer_occ = self.buffers.buffer_occupancies * 1.0

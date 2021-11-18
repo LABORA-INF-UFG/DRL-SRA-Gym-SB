@@ -22,6 +22,10 @@ class SraEnv1(gym.Env):
     self.beta = 0.0 # delay
     self.gamma = 1.0 # tx pkts
     try:
+      self.use_mean_eff = kwargs['use_mean_eff']
+    except:
+      self.use_mean_eff = False
+    try:
       self.alpha = kwargs['alpha']
       self.beta = kwargs['beta']
       self.gamma = kwargs['gamma']
@@ -65,6 +69,7 @@ class SraEnv1(gym.Env):
     self.recent_spectral_eff = (self.max_spectral_eff / len(self.F)) * np.ones((self.K, len(self.F)))  # in bps/Hz
     self.spectral_eff = (self.max_spectral_eff / len(self.F)) * np.ones((self.K, len(self.F)))  # in bps/Hz
     self.rates_pkt_per_s = np.array([])
+    self.full_eff = []
 
     # Buffer variables
     self.packet_size_bits = 1024  # if 1024, the number of packets per bit coincides with kbps
@@ -107,10 +112,15 @@ class SraEnv1(gym.Env):
 
     self.schedulers = []
     # creating the Round Robin scheduler instance with independent buffers
-    self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+    #self.schedulers.append(RoundRobin(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
     # another scheduler instance, for testing with multiple schedulers
-    self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+    #self.schedulers.append(ProportionalFair(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
     self.schedulers.append(MaxTh(K=self.K, F=self.F, buffers=copy.deepcopy(self.buffers)))
+    try:
+      if not kwargs['use_sch']:
+        self.schedulers = []
+    except:
+      print('Default Schedulers - Full')
 
   def step(self, action_index):
 
@@ -170,6 +180,7 @@ class SraEnv1(gym.Env):
       self.rws_hist.append(np.mean(self.rws))
       self.rws = []
     #print(self.eps_count)
+    self.full_eff = []
     self.curr_block = 0
     self.sub_curr_block = 0
     self.end_ep = True
@@ -201,7 +212,7 @@ class SraEnv1(gym.Env):
     self.end_ep = True
     # Cleaning count of users
     self.c_users = np.zeros(self.K)
-
+    self.full_eff = []
     # Buffer
     self.buffers.reset_buffers()  # Reseting buffers
     # get some traffic to avoid starting from empty buffers
@@ -365,9 +376,9 @@ class SraEnv1(gym.Env):
         curr_f = 0
         sc.exp_thr = self.rates_history[0]
         if self.full_obs:
-          ues = sc.policy_action_()
-        else:
           ues = sc.policy_action()
+        else:
+          ues = sc.policy_action_()
         for u in ues:
           sc.alloc_users[curr_f].append(u)
           if len(sc.alloc_users[curr_f]) == sc.F[curr_f]:
@@ -602,6 +613,7 @@ class SraEnv1(gym.Env):
       SE = self.mimo_systems[f].SE_current_sample(self.curr_block, users)
       for iu, u in enumerate(users):
         self.spectral_eff[u, f] = SE[iu]
+    self.full_eff.append(self.spectral_eff)
 
   def updateMIMO(self, mimo_systems: list,
                  curr_slot: int) -> list:  # Updating MIMO environment to the next slot, recalculating interferences
@@ -631,7 +643,20 @@ class SraEnv1(gym.Env):
       # estimate individual SE per frequency
       self.estimate_SE_all()
       # spectral_eff = self.spectral_eff / np.max(self.spectral_eff)
-      spectral_eff = np.array(self.spectral_eff)
+      if self.use_mean_eff:
+        #mean_eff = (self.max_spectral_eff / len(self.F)) * np.ones((self.K, len(self.F)))
+        mean_eff = [[[],[]] for u in range(self.K)]
+        me = [[[],[]] for u in range(self.K)]
+        for fe in self.full_eff:
+          for fek, vfek in enumerate(fe):
+            for fekf, vfekf in enumerate(vfek):
+              mean_eff[fek][fekf].append(vfekf)
+        for ifk, fk in enumerate(mean_eff):
+          for ifkf, fkf in enumerate(fk):
+            me[ifk][ifkf] = np.mean(fkf)
+        spectral_eff = np.array(me)
+      else:
+        spectral_eff = np.array(self.spectral_eff)
       se_flat = spectral_eff.flatten()
       se_flat_norm = se_flat / np.max(se_flat)
     else:
