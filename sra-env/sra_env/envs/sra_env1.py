@@ -235,6 +235,18 @@ class SraEnv1(gym.Env):
 
     return self.observation_space
 
+  def reset_b(self):  # Required by script to initialize the observation space
+    self.curr_block = 0
+    self.end_ep = True
+
+    self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F, tp=self.running_tp)
+
+    self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
+                                                 self.max_spectral_eff, self.max_packet_age)
+    self.ep_count += 1
+
+    return self.observation_space
+
   def step_(self, action_index):
     reward_schedulers = []
     individual_rw_schedulers = []
