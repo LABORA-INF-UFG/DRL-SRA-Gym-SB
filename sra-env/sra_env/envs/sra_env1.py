@@ -21,10 +21,16 @@ class SraEnv1(gym.Env):
     self.alpha = 1.0 # loss
     self.beta = 0.0 # delay
     self.gamma = 1.0 # tx pkts
+    self.rotate = False
     try:
       self.use_mean_eff = kwargs['use_mean_eff']
     except:
       self.use_mean_eff = False
+    try:
+      if kwargs['rotate']:
+        self.rotate = kwargs['rotate']
+    except:
+      pass
     try:
       self.alpha = kwargs['alpha']
       self.beta = kwargs['beta']
@@ -81,6 +87,7 @@ class SraEnv1(gym.Env):
       print('Default max age')
     self.buffers = Buffers(num_buffers=self.K, buffer_size=self.buffer_size, max_packet_age=self.max_packet_age)
     self.buffers.reset_buffers()  # Initializing buffers
+    self.copy_buffers = copy.deepcopy(self.buffers)
 
     # individual rates history
     self.rates_history = []
@@ -90,6 +97,13 @@ class SraEnv1(gym.Env):
 
     self.rws = []
     self.rws_hist = []
+
+    #set episodes
+    try:
+      self.pred_eps = kwargs['eps']
+      self.pred_eps_count = 0
+    except:
+      self.pred_eps = None
 
     # Massive MIMO System
 
@@ -179,6 +193,13 @@ class SraEnv1(gym.Env):
       print("Mean RW " + str(np.mean(self.rws)))
       self.rws_hist.append(np.mean(self.rws))
       self.rws = []
+    if self.rotate:
+      if self.tf_folder_acr == 'nds20':
+        self.tf_folder = '/traffic_interference_nds_25/'
+        self.tf_folder_acr = 'nds25'
+      else:
+        self.tf_folder = '/traffic_interference_nds_20/'
+        self.tf_folder_acr = 'nds20'
     #print(self.eps_count)
     self.full_eff = []
     self.curr_block = 0
@@ -217,6 +238,7 @@ class SraEnv1(gym.Env):
     self.buffers.reset_buffers()  # Reseting buffers
     # get some traffic to avoid starting from empty buffers
     self.buffers.packets_arrival(self.mimo_systems[0].get_current_income_packets())
+    self.copy_buffers = copy.deepcopy(self.buffers)
     self.rates_history = []
     # initialization to avoid error in the first run
     self.rates_history.append([self.buffer_size for i in range(self.K)])
@@ -238,8 +260,20 @@ class SraEnv1(gym.Env):
   def reset_b(self):  # Required by script to initialize the observation space
     self.curr_block = 0
     self.end_ep = True
+    if self.tf_folder_acr == 'nds25':
+      self.tf_folder = '/traffic_interference_nds_20/'
+      self.tf_folder_acr = 'nds20'
+    else:
+      self.tf_folder = '/traffic_interference_nds_25/'
+      self.tf_folder_acr = 'nds25'
+
+    self.mimo_systems = self.makeMIMO(self.F, self.K)
 
     self.mimo_systems = self.loadEpMIMO(self.mimo_systems, self.F, tp=self.running_tp)
+
+    self.buffers.reset_buffers()  # Reseting buffers
+    # get some traffic to avoid starting from empty buffers
+    self.buffers.packets_arrival(self.mimo_systems[0].get_current_income_packets())
 
     self.observation_space = self.updateObsSpace(self.buffers, self.buffer_size, self.recent_spectral_eff,
                                                  self.max_spectral_eff, self.max_packet_age)
@@ -504,6 +538,20 @@ class SraEnv1(gym.Env):
     self.rates_history.append(np.array(self.rates))
     return rates
 
+  def compute_rate_all(self):
+    # rate estimation for all users
+    users = list(range(self.K))
+    middle_index = len(users) // 2
+
+    alloc = [users[:middle_index], users[middle_index:]]
+    alloc = [users]
+    rates1 = self.rateEstimationUsers([self.F[0]], alloc, self.mimo_systems, self.K,
+                                          self.curr_block, self.packet_size_bits)
+    rates2 = self.rateEstimationUsers([self.F[1]], alloc, self.mimo_systems, self.K,
+                                      self.curr_block, self.packet_size_bits)
+
+    return [rates1, rates2]
+
   def compute_rate(self):
     # rate estimation for all users
     users = list(range(self.K))
@@ -737,7 +785,13 @@ class SraEnv1(gym.Env):
     else:
       self.episode_number = np.random.randint(self.mimo_systems[0].range_episodes_validate[0],
                                          self.mimo_systems[0].range_episodes_validate[1])
-
+    if self.pred_eps:
+      self.episode_number = self.pred_eps[self.pred_eps_count]
+      self.pred_eps_count += 1
+      if self.pred_eps_count > len(self.pred_eps)-1:
+        self.pred_eps_count = 0
+    if self.running_tp == 1:
+      print("Episode {}".format(self.episode_number))
     #if self.running_tp == 0:
 
     #  self.episode_number = choices(range(self.mimo_systems[0].num_episodes), self.eps_prob)[0]
@@ -763,6 +817,7 @@ class SraEnv1(gym.Env):
     #                                        self.mimo_systems[0].range_episodes_validate[1])
 
     for f in range(len(F)):
+      self.mimo_systems[f].set_tf_folder(self.tf_folder)
       # same episode number for all frequencies
       self.mimo_systems[f].load_episode(self.episode_number)
     return mimo_systems
