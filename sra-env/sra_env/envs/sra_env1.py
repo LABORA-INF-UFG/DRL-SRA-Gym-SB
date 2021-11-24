@@ -23,6 +23,14 @@ class SraEnv1(gym.Env):
     self.gamma = 1.0 # tx pkts
     self.rotate = False
     try:
+      self.force_error = kwargs['force_error']
+    except:
+      self.force_error = False
+    try:
+      self.use_se = kwargs['use_se']
+    except:
+      self.use_se = False
+    try:
       self.use_mean_eff = kwargs['use_mean_eff']
     except:
       self.use_mean_eff = False
@@ -471,8 +479,9 @@ class SraEnv1(gym.Env):
     last_SE = self.estimate_SE(self.F, self.alloc_users, self.mimo_systems, None, self.curr_block)
 
     # Updating SE per user selected
-    self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
-                                                  self.recent_spectral_eff, self.curr_block)
+    if not self.force_error:
+      self.recent_spectral_eff = self.updateSEUsers(self.F, self.alloc_users, self.mimo_systems,
+                                                    self.recent_spectral_eff, self.curr_block)
 
     reward, dropped_pkt, dropped_pkts_percent_mean, t_pkts_drl = self.rewardCalc_(self.F, self.alloc_users, self.mimo_systems,
                                                                                   self.K, self.curr_slot,
@@ -726,7 +735,10 @@ class SraEnv1(gym.Env):
 
     #return np.hstack(
     #  (buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))  # oldest without normalization
-    return np.hstack((buffer_occupancies, se_flat, oldest_packet_per_buffer_norm))  # oldest without normalization
+    if self.use_se:
+      return np.hstack((buffer_occupancies, se_flat, oldest_packet_per_buffer_norm))  # oldest without normalization
+    else:
+      return np.hstack((buffer_occupancies, oldest_packet_per_buffer_norm))  # oldest without normalization
     #return np.hstack(
     #  (buffer_occupancies_norm, se_flat_norm, oldest_packet_per_buffer_norm))  # normalized
 
