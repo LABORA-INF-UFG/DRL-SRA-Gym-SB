@@ -23,6 +23,10 @@ class SraEnv1(gym.Env):
     self.gamma = 1.0 # tx pkts
     self.rotate = False
     try:
+      self.se_ues_op = kwargs['se_ues_op']
+    except:
+      self.se_ues_op = None
+    try:
       self.force_error = kwargs['force_error']
     except:
       self.force_error = False
@@ -635,7 +639,7 @@ class SraEnv1(gym.Env):
 
     for f in range(len(F)):
       for au in alloc_users[f]:
-        se_freq = mimo_systems[f].SE_current_sample(curr_slot, [au])
+        se_freq = mimo_systems[f].SE_current_sample(curr_slot, [au], self.se_ues_op)
         rates = (se_freq[0] * mimo_systems[f].BW[f]) / packet_size_bits
         rates_pkt_per_s[au] = rates
     return rates_pkt_per_s
@@ -645,7 +649,7 @@ class SraEnv1(gym.Env):
     rates_pkt_per_s = np.zeros((K,))  # Considering rates are per second
 
     for f in range(len(F)):
-      se_freq = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f])
+      se_freq = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f], self.se_ues_op)
       # se_freq = mimo_systems[f].SE_for_given_sample(curr_slot, alloc_users[f], F[f],
       #                                              avoid_estimation_errors=False)
       for iu, u in enumerate(alloc_users[f]):
@@ -657,7 +661,7 @@ class SraEnv1(gym.Env):
   def updateSEUsers(self, F: list, alloc_users: list, mimo_systems: list, recent_spectral_eff: np.ndarray,
                     curr_slot: int):  # Function which update the Spectral efficiency value for each UE used in the last block
     for f in range(len(F)):
-      SE = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f])
+      SE = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f], self.se_ues_op)
       for iu, u in enumerate(alloc_users[f]):
         recent_spectral_eff[u, f] = SE[iu]
     return recent_spectral_eff
@@ -669,7 +673,7 @@ class SraEnv1(gym.Env):
     SE = []
 
     for f in range(len(F)):
-      au_SE = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f])
+      au_SE = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f], self.se_ues_op)
       sum_SE += np.sum(au_SE)
       for iu, u in enumerate(alloc_users[f]):
         SE.append(au_SE[iu])
@@ -679,7 +683,7 @@ class SraEnv1(gym.Env):
   def estimate_SE_all(self):
     users = list(range(self.K))
     for f in range(len(self.F)):
-      SE = self.mimo_systems[f].SE_current_sample(self.curr_block, users)
+      SE = self.mimo_systems[f].SE_current_sample(self.curr_block, users, self.se_ues_op)
       for iu, u in enumerate(users):
         self.spectral_eff[u, f] = SE[iu]
     self.full_eff.append(self.spectral_eff)
