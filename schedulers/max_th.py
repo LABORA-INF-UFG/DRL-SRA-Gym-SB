@@ -20,7 +20,7 @@ class MaxTh(Scheduler):
     # partial obs
     def policy_action_(self) -> int:
         # choose between the throughput available to send or the buffer size to send values
-        buffer_occ = self.buffers.buffer_occupancies *  1 #1.17
+        buffer_occ = self.buffers.buffer_occupancies *  1.17 #1.17
         thr = None
         bu_count = 0
         best_users = []
@@ -36,7 +36,7 @@ class MaxTh(Scheduler):
     # full obs
     def policy_action(self) -> int:
         # choose between the throughput available to send or the buffer size to send values
-        buffer_occ = self.buffers.buffer_occupancies * 1.0
+        buffer_occ = self.buffers.buffer_occupancies * 1.17
         #using QCI information
         thr = np.minimum(self.exp_thr, buffer_occ)# choose between the throughput available to send or the buffer size to send values
 

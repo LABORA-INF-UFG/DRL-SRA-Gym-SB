@@ -3,6 +3,7 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 import numpy as np
 import copy
+import random
 
 from random import choices
 from akpy.buffers_at_BS_n import Buffers
@@ -24,8 +25,12 @@ class SraEnv1(gym.Env):
     self.rotate = False
     try:
       self.se_ues_op = kwargs['se_ues_op']
+      self.shuffle_se_op = kwargs['shuffle_se_op']
+      self.random_op = kwargs['random_op']
     except:
       self.se_ues_op = None
+      self.shuffle_se_op = False
+      self.random_op = False
     try:
       self.force_error = kwargs['force_error']
     except:
@@ -34,6 +39,10 @@ class SraEnv1(gym.Env):
       self.use_se = kwargs['use_se']
     except:
       self.use_se = False
+    try:
+      self.norm_obs = kwargs['norm_obs']
+    except:
+      self.norm_obs = False
     try:
       self.use_mean_eff = kwargs['use_mean_eff']
     except:
@@ -81,13 +90,16 @@ class SraEnv1(gym.Env):
     # Allocated users per frequency, e.g. [[1,2,3],[4,5,6]] which means that user 1, 2 and 3 were
     # allocated in the first frequency and users 4, 5 and 6 were allocated in the second frequency
     self.alloc_users = [[] for i in range(len(self.F))]
-    self.prev_alloc_users = [[] for i in range(len(self.F))]
+    self.hist_alloc_users = np.zeros((len(self.F), self.K))
     self.max_spectral_eff = 7.8  # from dump_SE_values_on_stdout()
     # self.recent_spectral_eff = (self.max_spectral_eff / 2) * np.ones((self.K, len(self.F)))  # in bps/Hz
     self.recent_spectral_eff = (self.max_spectral_eff / len(self.F)) * np.ones((self.K, len(self.F)))  # in bps/Hz
     self.spectral_eff = (self.max_spectral_eff / len(self.F)) * np.ones((self.K, len(self.F)))  # in bps/Hz
     self.rates_pkt_per_s = np.array([])
     self.full_eff = []
+    self.full_eff_hist = [] # collecting all SE history
+    self.full_rate_hist = []
+    self.episode_rate_hist = []
 
     # Buffer variables
     self.packet_size_bits = 1024  # if 1024, the number of packets per bit coincides with kbps
@@ -201,6 +213,13 @@ class SraEnv1(gym.Env):
 
   def reset(self):  # Required by script to initialize the observation space
 
+    if self.se_ues_op and self.shuffle_se_op:
+      random.shuffle(self.se_ues_op)
+
+    if self.random_op:
+      rp = [random.uniform(0.1, 2.0) for se in range(self.K)]
+      self.se_ues_op = rp
+
     if len(self.rws) > 0:
       print("Mean RW " + str(np.mean(self.rws)))
       self.rws_hist.append(np.mean(self.rws))
@@ -245,6 +264,10 @@ class SraEnv1(gym.Env):
     self.end_ep = True
     # Cleaning count of users
     self.c_users = np.zeros(self.K)
+    self.full_rate_hist.append(np.mean(self.episode_rate_hist, axis=0))
+    self.episode_rate_hist = []
+    # computing average SE by UE/Fc
+    self.full_eff_hist.append(np.mean(self.full_eff, axis=0))
     self.full_eff = []
     # Buffer
     self.buffers.reset_buffers()  # Reseting buffers
@@ -426,7 +449,10 @@ class SraEnv1(gym.Env):
     action = self.actions[action_index]
     for act in action:
       self.alloc_users[self.curr_freq] = act
+      for a in act:
+        self.hist_alloc_users[self.curr_freq][a] += 1
       self.curr_freq += 1
+
 
     ## baseline schedulers allocation
     for sc in self.schedulers:
@@ -480,7 +506,14 @@ class SraEnv1(gym.Env):
     self.rates_pkt_per_s = self.rateEstimationUsers(self.F, self.alloc_users, self.mimo_systems, self.K,
                                                     self.curr_block, self.packet_size_bits)
 
+    mr = self.max_rate(self.F, [[0,1,2,3,4,5,6,7,8,9], [0,1,2,3,4,5,6,7,8,9]], self.mimo_systems, self.K,
+                                                    self.curr_block, self.packet_size_bits)
+
+    self.episode_rate_hist.append(mr)
+
     last_SE = self.estimate_SE(self.F, self.alloc_users, self.mimo_systems, None, self.curr_block)
+
+    self.estimate_SE_all()
 
     # Updating SE per user selected
     if not self.force_error:
@@ -500,6 +533,7 @@ class SraEnv1(gym.Env):
     pkt_loss[0].append(loss)
     pkt_delay[0].append(self.compute_pkt_delay(self.buffers))
     se_hist[0].append(np.mean(last_SE[1]))
+    individual_loss = np.array(self.buffers.buffer_history_dropped) / np.array(self.buffers.buffer_history_incoming)
 
     # resetting the allocated users
     self.alloc_users = [[] for i in range(len(self.F))]
@@ -537,7 +571,7 @@ class SraEnv1(gym.Env):
     #return self.observation_space, [reward, reward_schedulers, pkt_loss, pkt_delay], self.end_ep, info
 
     return self.observation_space, [reward, reward_schedulers, pkt_loss, pkt_delay, se_hist],\
-           self.end_ep, info, individual_rw_schedulers, t_pkts_drl
+           self.end_ep, info, individual_rw_schedulers, t_pkts_drl, individual_loss
 
 
   def compute_rates(self):
@@ -644,6 +678,20 @@ class SraEnv1(gym.Env):
         rates_pkt_per_s[au] = rates
     return rates_pkt_per_s
 
+  def max_rate(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int,
+                          packet_size_bits: int) -> list:  # Calculates the rate per second for each user considering if it was selected to transmit in any frequency and
+    rates_pkt_per_s = np.zeros((K,len(F)))  # Considering rates are per second
+    buffer_occ = self.buffers.buffer_occupancies
+    for f in range(len(F)):
+      se_freq = mimo_systems[f].SE_current_sample(curr_slot, alloc_users[f], self.se_ues_op)
+      # se_freq = mimo_systems[f].SE_for_given_sample(curr_slot, alloc_users[f], F[f],
+      #                                              avoid_estimation_errors=False)
+      for iu, u in enumerate(alloc_users[f]):
+        rate = (se_freq[iu] * mimo_systems[f].BW[f]) / packet_size_bits
+        rates_pkt_per_s[iu][f] = np.minimum(rate, buffer_occ[iu])
+
+    return rates_pkt_per_s
+
   def rateEstimationUsers(self, F: list, alloc_users: list, mimo_systems: list, K: int, curr_slot: int,
                           packet_size_bits: int) -> list:  # Calculates the rate per second for each user considering if it was selected to transmit in any frequency and
     rates_pkt_per_s = np.zeros((K,))  # Considering rates are per second
@@ -686,7 +734,8 @@ class SraEnv1(gym.Env):
       SE = self.mimo_systems[f].SE_current_sample(self.curr_block, users, self.se_ues_op)
       for iu, u in enumerate(users):
         self.spectral_eff[u, f] = SE[iu]
-    self.full_eff.append(self.spectral_eff)
+    self.full_eff.append(copy.deepcopy(self.spectral_eff))
+
 
   def updateMIMO(self, mimo_systems: list,
                  curr_slot: int) -> list:  # Updating MIMO environment to the next slot, recalculating interferences
@@ -740,7 +789,10 @@ class SraEnv1(gym.Env):
     #return np.hstack(
     #  (buffer_occupancies, spectral_eff.flatten(), oldest_packet_per_buffer))  # oldest without normalization
     if self.use_se:
-      return np.hstack((buffer_occupancies, se_flat, oldest_packet_per_buffer_norm))  # oldest without normalization
+      if self.norm_obs:
+        return np.hstack(
+          (buffer_occupancies_norm, se_flat_norm, oldest_packet_per_buffer_norm))  # oldest with normalization
+      return np.hstack((buffer_occupancies, se_flat, oldest_packet_per_buffer_norm))  # oldest with normalization
     else:
       return np.hstack((buffer_occupancies, oldest_packet_per_buffer_norm))  # oldest without normalization
     #return np.hstack(
@@ -772,6 +824,7 @@ class SraEnv1(gym.Env):
     available_rate = np.floor(pkt_rate).astype(int)
     t_pkts = available_rate if (np.sum(available_rate) == 0) else buffers.packets_departure(
       available_rate)  # transmission pkts
+    #incoming_pkts = mimo_systems[0].get_current_income_packets(pck_op=self.se_ues_op) # using the same SE operator factor to incomming traffic
     incoming_pkts = mimo_systems[0].get_current_income_packets()
     buffers.packets_arrival(incoming_pkts)  # Updating Buffer
     dropped_pkts = buffers.get_dropped_last_iteration()
@@ -806,8 +859,8 @@ class SraEnv1(gym.Env):
       self.pred_eps_count += 1
       if self.pred_eps_count > len(self.pred_eps)-1:
         self.pred_eps_count = 0
-    if self.running_tp == 1:
-      print("Episode {}".format(self.episode_number))
+    #if self.running_tp == 1:
+    #  print("Episode {}".format(self.episode_number))
     #if self.running_tp == 0:
 
     #  self.episode_number = choices(range(self.mimo_systems[0].num_episodes), self.eps_prob)[0]
